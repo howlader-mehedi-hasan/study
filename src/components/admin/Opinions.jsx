@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash, MessageSquare, Star, Pencil, X, Save } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 const Opinions = () => {
     const [opinions, setOpinions] = useState([]);
@@ -13,8 +14,9 @@ const Opinions = () => {
 
     const fetchOpinions = async () => {
         try {
-            const res = await fetch("/api/opinions");
-            if (res.ok) setOpinions(await res.json());
+            const { data, error } = await supabase.from('opinions').select('*').order('date', { ascending: false });
+            if (error) throw error;
+            setOpinions(data);
         } catch (error) {
             console.error("Failed to fetch opinions", error);
         }
@@ -23,8 +25,9 @@ const Opinions = () => {
     const handleDelete = async (id) => {
         if (!window.confirm("Delete this feedback?")) return;
         try {
-            const res = await fetch(`/api/admin/opinions/${id}`, { method: "DELETE" });
-            if (res.ok) fetchOpinions();
+            const { error } = await supabase.from('opinions').delete().eq('id', id);
+            if (error) throw error;
+            fetchOpinions();
         } catch (error) {
             console.error(error);
         }
@@ -38,16 +41,15 @@ const Opinions = () => {
     const handleSave = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`/api/admin/opinions/${editingOpinion.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(editForm)
-            });
+            const { error } = await supabase.from('opinions').update({
+                rating: editForm.rating,
+                feedback: editForm.feedback
+            }).eq('id', editingOpinion.id);
 
-            if (res.ok) {
-                setEditingOpinion(null);
-                fetchOpinions();
-            }
+            if (error) throw error;
+
+            setEditingOpinion(null);
+            fetchOpinions();
         } catch (error) {
             console.error(error);
         }

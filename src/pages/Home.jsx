@@ -2,8 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { BookOpen, Calendar, FileText, Bell, Clock, ArrowRight, Activity, Edit, Check, X } from "lucide-react";
-import courses from "../data/courses.json";
-import notices from "../data/notices.json";
+import { supabase } from "../lib/supabaseClient";
 import DailyRoutine from "../components/DailyRoutine";
 import NewsTicker from "../components/NewsTicker";
 
@@ -15,70 +14,93 @@ export default function Home() {
     const [tempMessage, setTempMessage] = useState("");
     const [settings, setSettings] = useState({});
 
-    // Fetch Settings on Mount
+    const [coursesCount, setCoursesCount] = useState(0);
+    const [totalFiles, setTotalFiles] = useState(0);
+    const [recentNotices, setRecentNotices] = useState([]);
+    const [nextExam, setNextExam] = useState(null);
+
+    // Fetch All Data
     useEffect(() => {
-        fetch("/api/settings")
-            .then(res => res.json())
-            .then(data => {
-                setSettings(data);
-                if (data.welcomeMessage) {
-                    setWelcomeMessage(data.welcomeMessage);
+        const fetchData = async () => {
+            try {
+                // 1. Settings
+                const { data: settingsData } = await supabase.from('settings').select('*').single();
+                if (settingsData) {
+                    setSettings(settingsData);
+                    if (settingsData.welcome_message) {
+                        setWelcomeMessage(settingsData.welcome_message);
+                    }
                 }
-            })
-            .catch(err => console.error("Failed to fetch settings", err));
+
+                // 2. Counts
+                const { count: cCount } = await supabase.from('courses').select('*', { count: 'exact', head: true });
+                setCoursesCount(cCount || 0);
+
+                const { count: fCount } = await supabase.from('course_files').select('*', { count: 'exact', head: true });
+                setTotalFiles(fCount || 0);
+
+                // 3. Recent Notices
+                const { data: noticesData } = await supabase
+                    .from('notices')
+                    .select('*')
+                    .order('date', { ascending: false })
+                    .limit(3);
+
+                if (noticesData) {
+                    setRecentNotices(noticesData.map(n => ({ ...n, validUntil: n.valid_until, pdfPath: n.pdf_path })));
+                }
+
+                // 4. Next Exam
+                const todayStr = new Date().toISOString().split('T')[0];
+                const { data: examsData } = await supabase
+                    .from('exams')
+                    .select('*, courses(name)')
+                    .gte('date', todayStr)
+                    .order('date', { ascending: true })
+                    .limit(1);
+
+                if (examsData && examsData.length > 0) {
+                    const exam = examsData[0];
+                    const examDate = new Date(`${exam.date}T${exam.time}`);
+                    setNextExam({
+                        ...exam,
+                        examDate,
+                        courseName: exam.courses?.name,
+                        courseId: exam.course_id
+                    });
+                } else {
+                    setNextExam(null);
+                }
+
+            } catch (err) {
+                console.error("Failed to load dashboard data", err);
+            }
+        };
+
+        fetchData();
     }, []);
 
     const handleSaveMessage = async () => {
-        const newSettings = { ...settings, welcomeMessage: tempMessage };
+        const newSettings = { ...settings, welcome_message: tempMessage };
         try {
-            const res = await fetch("/api/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newSettings)
+            const { error } = await supabase.from('settings').upsert({
+                id: 1,
+                welcome_message: tempMessage
             });
-            if (res.ok) {
-                setWelcomeMessage(tempMessage);
-                setSettings(newSettings);
-                setIsEditingMessage(false);
-            }
+
+            if (error) throw error;
+
+            setWelcomeMessage(tempMessage);
+            setSettings(newSettings);
+            setIsEditingMessage(false);
+
         } catch (error) {
             console.error("Failed to save settings", error);
         }
     };
 
-    // 1. Logic: Find Next Exam
-    const nextExam = useMemo(() => {
-        let allExams = [];
-        courses.forEach(course => {
-            if (course.exams) {
-                course.exams.forEach(exam => {
-                    const examDate = new Date(`${exam.date}T${exam.time}`); // ISO date
-                    if (examDate > today) {
-                        allExams.push({
-                            ...exam,
-                            examDate, // store Date object for sorting
-                            courseName: course.name,
-                            courseId: course.id
-                        });
-                    }
-                });
-            }
-        });
-        // Sort by date ascending
-        allExams.sort((a, b) => a.examDate - b.examDate);
-        return allExams.length > 0 ? allExams[0] : null;
-    }, [courses]);
+    // Logic replaced by Supabase fetch
 
-    // 2. Logic: Get Latest Notices (Top 3)
-    const recentNotices = useMemo(() => {
-        const sortedNotices = [...notices].sort((a, b) => new Date(b.date) - new Date(a.date));
-        return sortedNotices.slice(0, 3);
-    }, [notices]);
-
-    // 3. Logic: Get Tasks Count (Course Files)
-    const totalFiles = useMemo(() => {
-        return courses.reduce((acc, course) => acc + (course.files ? course.files.length : 0), 0);
-    }, [courses]);
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -136,7 +158,7 @@ export default function Home() {
                 <div className="mt-4 md:mt-0 flex gap-4 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm border border-gray-100 dark:border-slate-700">
                     <div className="flex items-center">
                         <BookOpen className="w-4 h-4 mr-2 text-blue-500" />
-                        <span>{courses.length} Courses</span>
+                        <span>{coursesCount} Courses</span>
                     </div>
                     <div className="flex items-center">
                         <FileText className="w-4 h-4 mr-2 text-green-500" />
@@ -146,7 +168,13 @@ export default function Home() {
             </div>
 
             {/* News Ticker */}
-            <NewsTicker notices={notices} customMessage={settings.breakingNews} />
+            <NewsTicker
+                notices={recentNotices}
+                customMessage={settings.breaking_news}
+                bgColor={settings.news_bg_color}
+                textColor={settings.news_text_color}
+                isRounded={settings.news_is_rounded}
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 

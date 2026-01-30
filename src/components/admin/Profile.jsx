@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Key, Lock, Check, Loader2, User, Shield, Save } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 const Profile = ({ user }) => {
     // Initialize state with user data (with defensive checks)
@@ -40,22 +41,15 @@ const Profile = ({ user }) => {
                 payload.password = formData.password;
             }
 
-            const response = await fetch(`/api/users/${user.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
+            const { error } = await supabase.from('users').update(payload).eq('id', user.id);
 
-            const data = await response.json();
+            if (error) throw error;
 
-            if (response.ok) {
-                setMessage({ type: "success", text: "Profile updated successfully. Please re-login if username/password changed." });
-                setFormData(prev => ({ ...prev, password: "" })); // Clear password field
-            } else {
-                setMessage({ type: "error", text: data.error || "Failed to update profile" });
-            }
+            setMessage({ type: "success", text: "Profile updated successfully. Please re-login if username/password changed." });
+            setFormData(prev => ({ ...prev, password: "" })); // Clear password field
+
         } catch (error) {
-            setMessage({ type: "error", text: "Error updating profile" });
+            setMessage({ type: "error", text: "Error updating profile: " + error.message });
         } finally {
             setIsLoading(false);
         }

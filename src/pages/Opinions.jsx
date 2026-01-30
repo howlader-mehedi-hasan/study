@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Star, MessageSquare, Send, ThumbsUp } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Opinions() {
     const [rating, setRating] = useState(0);
@@ -15,11 +16,13 @@ export default function Opinions() {
 
     const fetchOpinions = async () => {
         try {
-            const res = await fetch('/api/opinions');
-            if (res.ok) {
-                const data = await res.json();
-                setFeed(data);
-            }
+            const { data, error } = await supabase
+                .from('opinions')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+            setFeed(data);
         } catch (error) {
             console.error("Failed to fetch opinions", error);
         }
@@ -33,21 +36,20 @@ export default function Opinions() {
         }
 
         try {
-            const response = await fetch('/api/opinions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rating, feedback })
-            });
+            const { error } = await supabase.from('opinions').insert([{
+                rating,
+                feedback,
+                date: new Date().toISOString()
+            }]);
 
-            if (response.ok) {
-                setStatus('success');
-                setRating(0);
-                setFeedback("");
-                fetchOpinions(); // Refresh feed
-                setTimeout(() => setStatus(null), 3000);
-            } else {
-                setStatus('error');
-            }
+            if (error) throw error;
+
+            setStatus('success');
+            setRating(0);
+            setFeedback("");
+            fetchOpinions(); // Refresh feed
+            setTimeout(() => setStatus(null), 3000);
+
         } catch (error) {
             console.error(error);
             setStatus('error');

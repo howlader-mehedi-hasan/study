@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabaseClient";
 import { Plus, Calendar, Clock, FileText, Download, Trash2, Edit, X, Save, AlertCircle } from "lucide-react";
 
 const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete }) => {
@@ -109,10 +110,18 @@ export default function Notices() {
 
     const fetchNotices = async () => {
         try {
-            const res = await fetch('/api/notices');
-            const data = await res.json();
+            const { data, error } = await supabase.from('notices').select('*');
+            if (error) throw error;
+
+            // Map snake_case to camelCase
+            const mapped = data.map(n => ({
+                ...n,
+                validUntil: n.valid_until,
+                pdfPath: n.pdf_path
+            }));
+
             // Sort by date descending
-            setNotices(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
+            setNotices(mapped.sort((a, b) => new Date(b.date) - new Date(a.date)));
         } catch (error) {
             console.error("Error fetching notices:", error);
         }
@@ -122,27 +131,33 @@ export default function Notices() {
         if (!isAdmin) {
             if (!window.confirm("Send deletion request for this notice?")) return;
             try {
-                const response = await fetch("/api/deletion-requests", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "notice",
-                        resourceId: id,
-                        details: { title: notices.find(n => n.id === id)?.title || "Notice" },
-                        requestedBy: user.username
-                    })
+                // Find notice details
+                const notice = notices.find(n => n.id === id);
+                const { error } = await supabase.from('deletion_requests').insert({
+                    type: 'notice',
+                    resource_id: id,
+                    details: {
+                        name: notice ? notice.title : 'Unknown Notice',
+                        category: notice ? notice.category : 'General'
+                    },
+                    requested_by: user.username,
+                    status: 'pending',
+                    date: new Date().toISOString()
                 });
-                if (response.ok) alert("Deletion request sent to Admin.");
-                else alert("Failed to send request.");
+
+                if (error) throw error;
+                alert("Deletion request sent successfully!");
             } catch (err) {
-                alert("Failed to send request.");
+                console.error("Error sending deletion request:", err);
+                alert("Failed to send deletion request.");
             }
             return;
         }
 
         if (!window.confirm("Are you sure you want to delete this notice?")) return;
         try {
-            await fetch(`/api/notices/${id}`, { method: 'DELETE' });
+            const { error } = await supabase.from('notices').delete().eq('id', id);
+            if (error) throw error;
             fetchNotices();
         } catch (error) {
             console.error("Error deleting notice:", error);
@@ -184,25 +199,18 @@ export default function Notices() {
 
         // Upload file if selected
         if (file) {
-            const uploadData = new FormData();
-            uploadData.append('file', file);
             try {
-                const res = await fetch('/api/notices/pdf', {
-                    method: 'POST',
-                    body: uploadData
-                });
+                const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
-                if (!res.ok) {
-                    const text = await res.text();
-                    throw new Error(`Server returned ${res.status}: ${text}`);
-                }
+                const { error: uploadError } = await supabase.storage
+                    .from('notices')
+                    .upload(fileName, file);
 
-                const data = await res.json();
-                if (data.success) {
-                    finalPdfPath = data.filePath;
-                } else {
-                    throw new Error(data.error || "Unknown upload error");
-                }
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage.from('notices').getPublicUrl(fileName);
+                finalPdfPath = publicUrl;
+
             } catch (error) {
                 console.error("File upload failed:", error);
                 alert(`Failed to upload PDF: ${error.message}`);
@@ -211,19 +219,27 @@ export default function Notices() {
         }
 
         // Save Notice
-        const noticeToSave = { ...formData, pdfPath: finalPdfPath, username: user.username };
+        const noticePayload = {
+            id: formData.id,
+            title: formData.title,
+            date: formData.date,
+            valid_until: formData.validUntil,
+            category: formData.category,
+            description: formData.description,
+            content: formData.content,
+            pdf_path: finalPdfPath,
+            username: user.username
+        };
 
         try {
-            const res = await fetch('/api/notices', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(noticeToSave)
-            });
-            if (res.ok) {
+            const { error } = await supabase.from('notices').upsert(noticePayload);
+
+            if (error) {
+                console.error(error);
+                alert("Failed to save notice");
+            } else {
                 setIsModalOpen(false);
                 fetchNotices();
-            } else {
-                alert("Failed to save notice");
             }
         } catch (error) {
             console.error("Error saving notice:", error);

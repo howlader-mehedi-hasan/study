@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import usersData from "../data/users.json";
+import { supabase } from "../lib/supabaseClient";
+
 
 const AuthContext = createContext();
 
@@ -19,21 +20,24 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
+            // Updated to query Supabase 'users' table
+            // Note: This matches the previous logic of simple password comparison.
+            // Ideally, switch to Supabase Auth or hashed passwords in production.
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('username', username)
+                .eq('password', password)
+                .single();
 
-            const data = await res.json();
-
-            if (data.success) {
-                setUser(data.user);
-                localStorage.setItem("auth_user", JSON.stringify(data.user));
-                return { success: true };
-            } else {
-                return { success: false, error: data.error || "Login failed" };
+            if (error || !data) {
+                return { success: false, error: "Invalid username or password" };
             }
+
+            setUser(data);
+            localStorage.setItem("auth_user", JSON.stringify(data));
+            return { success: true };
+
         } catch (error) {
             console.error("Login error:", error);
             return { success: false, error: "Server error during login" };

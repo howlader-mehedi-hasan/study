@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, Pencil, Trash, X, Save, Shield, Key, Check } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
@@ -21,10 +22,9 @@ const UserManagement = () => {
         messages_view: false,
         complaints_view: false,
         opinions_view: false,
-        exams_edit: false,
-        exams_edit: false,
         course_materials_edit: false,
-        breaking_news_edit: false
+        breaking_news_edit: false,
+        exams_edit: false
     });
 
     // Edit/Feedback State
@@ -40,10 +40,9 @@ const UserManagement = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch("/api/users");
-            if (response.ok) {
-                setUsers(await response.json());
-            }
+            const { data, error } = await supabase.from('users').select('*').order('name');
+            if (error) throw error;
+            setUsers(data);
         } catch (error) {
             console.error("Failed to fetch users");
         }
@@ -52,38 +51,34 @@ const UserManagement = () => {
     const handleCreateUser = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch("/api/users", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    username: newUserUsername,
-                    password: newUserPassword,
-                    name: newName,
-                    role: newRole,
-                    permissions: newRole === 'admin' ? null : newPermissions
-                }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                setUserMessage({ type: "success", text: "User created successfully!" });
-                setNewUserUsername("");
-                setNewUserPassword("");
-                setNewName("");
-                fetchUsers();
-                setTimeout(() => setUserMessage(null), 3000);
-            } else {
-                setUserMessage({ type: "error", text: data.error });
-            }
+            const { error } = await supabase.from('users').insert([{
+                username: newUserUsername,
+                password: newUserPassword, // Recommend hashing in production
+                name: newName,
+                role: newRole,
+                permissions: newRole === 'admin' ? {} : newPermissions
+            }]);
+
+            if (error) throw error;
+
+            setUserMessage({ type: "success", text: "User created successfully!" });
+            setNewUserUsername("");
+            setNewUserPassword("");
+            setNewName("");
+            fetchUsers();
+            setTimeout(() => setUserMessage(null), 3000);
+
         } catch (error) {
-            setUserMessage({ type: "error", text: "Failed to create user" });
+            setUserMessage({ type: "error", text: "Failed to create user: " + error.message });
         }
     };
 
     const handleDeleteUser = async (id) => {
         if (!window.confirm("Delete this user?")) return;
         try {
-            const response = await fetch(`/api/users/${id}`, { method: "DELETE" });
-            if (response.ok) fetchUsers();
+            const { error } = await supabase.from('users').delete().eq('id', id);
+            if (error) throw error;
+            fetchUsers();
         } catch (error) {
             console.error(error);
         }
@@ -97,20 +92,26 @@ const UserManagement = () => {
     const handleSaveUser = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`/api/users/${editingUser.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(editUserForm)
-            });
-
-            if (res.ok) {
-                setEditingUser(null);
-                fetchUsers();
-                setUserMessage({ type: "success", text: "User updated successfully" });
-                setTimeout(() => setUserMessage(null), 3000);
+            const updates = {
+                name: editUserForm.name,
+                username: editUserForm.username
+            };
+            if (editUserForm.password) {
+                updates.password = editUserForm.password;
             }
+
+            const { error } = await supabase.from('users').update(updates).eq('id', editingUser.id);
+
+            if (error) throw error;
+
+            setEditingUser(null);
+            fetchUsers();
+            setUserMessage({ type: "success", text: "User updated successfully" });
+            setTimeout(() => setUserMessage(null), 3000);
+
         } catch (error) {
             console.error("Error updating user", error);
+            setUserMessage({ type: "error", text: "Failed to update user" });
         }
     };
 
@@ -128,7 +129,6 @@ const UserManagement = () => {
             complaints_view: false,
             opinions_view: false,
             exams_edit: false,
-            exams_edit: false,
             course_materials_edit: false,
             breaking_news_edit: false
         });
@@ -137,18 +137,18 @@ const UserManagement = () => {
     const handlePermissionsSave = async () => {
         if (!permissionsModalUser) return;
         try {
-            const res = await fetch(`/api/users/${permissionsModalUser.id}/permissions`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ permissions: permissionsToEdit })
-            });
-            if (res.ok) {
-                alert("Permissions updated successfully!");
-                setPermissionsModalUser(null);
-                fetchUsers();
-            }
+            const { error } = await supabase.from('users')
+                .update({ permissions: permissionsToEdit })
+                .eq('id', permissionsModalUser.id);
+
+            if (error) throw error;
+
+            alert("Permissions updated successfully!");
+            setPermissionsModalUser(null);
+            fetchUsers();
         } catch (error) {
             console.error(error);
+            alert("Error updating permissions");
         }
     };
 

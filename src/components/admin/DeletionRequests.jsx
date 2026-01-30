@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash, Check, X, Inbox } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 const DeletionRequests = () => {
     const [requests, setRequests] = useState([]);
@@ -11,8 +12,18 @@ const DeletionRequests = () => {
 
     const fetchRequests = async () => {
         try {
-            const res = await fetch("/api/admin/deletion-requests");
-            if (res.ok) setRequests(await res.json());
+            const { data, error } = await supabase.from('deletion_requests').select('*').eq('status', 'pending');
+            if (error) throw error;
+            // Map columns
+            const mapped = data.map(req => ({
+                id: req.id,
+                type: req.type,
+                resourceId: req.resource_id,
+                details: req.details,
+                requestedBy: req.requested_by,
+                timestamp: req.date
+            }));
+            setRequests(mapped);
         } catch (error) {
             console.error("Failed to fetch requests", error);
         }
@@ -20,24 +31,60 @@ const DeletionRequests = () => {
 
     const handleApprove = async (id) => {
         if (!window.confirm("Approve this deletion? This item will be permanently deleted.")) return;
+
         try {
-            const res = await fetch(`/api/admin/deletion-requests/${id}/approve`, { method: "POST" });
-            if (res.ok) {
-                fetchRequests();
+            const request = requests.find(r => r.id === id);
+            if (!request) return;
+
+            let deleteError = null;
+
+            // Execute deletion based on type
+            if (request.type === 'course') {
+                // Files deleted cascade usually, but if not we might need to delete from storage manually.
+                // For now, assuming cascade or just delete row.
+                const { error } = await supabase.from('courses').delete().eq('id', request.resourceId);
+                deleteError = error;
+            } else if (request.type === 'file') {
+                const { error } = await supabase.from('course_files').delete().eq('id', request.resourceId);
+                deleteError = error;
+                // Should also delete from storage if we had path. 
+                // Assuming filename is in request.details.fileName if needed, but row deletion is primary.
+            } else if (request.type === 'exam') {
+                const { error } = await supabase.from('exams').delete().eq('id', request.resourceId);
+                deleteError = error;
+            } else if (request.type === 'syllabus') {
+                const { error } = await supabase.from('syllabus').delete().eq('code', request.resourceId);
+                deleteError = error;
+            } else if (request.type === 'notice') {
+                const { error } = await supabase.from('notices').delete().eq('id', request.resourceId);
+                deleteError = error;
             }
+
+            if (deleteError) throw deleteError;
+
+            // Update request status
+            const { error: reqError } = await supabase.from('deletion_requests').update({ status: 'approved' }).eq('id', id);
+            if (reqError) throw reqError;
+
+            fetchRequests();
+
         } catch (error) {
-            alert("Error approving request");
+            console.error("Error approving request:", error);
+            alert("Error approving request: " + error.message);
         }
     };
 
     const handleReject = async (id) => {
         if (!window.confirm("Reject this request?")) return;
         try {
-            const res = await fetch(`/api/admin/deletion-requests/${id}`, { method: "DELETE" });
-            if (res.ok) {
-                fetchRequests();
-            }
+            // Just delete the request or mark rejected. Let's delete it to keep list clean, 
+            // or mark rejected if we had a history view. Current view only shows pending?
+            // Original API deleted it.
+            const { error } = await supabase.from('deletion_requests').delete().eq('id', id);
+            if (error) throw error;
+            fetchRequests();
         } catch (error) {
+            console.error("Error rejecting request:", error);
             alert("Error rejecting request");
         }
     };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash, Mail } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 const Messages = () => {
     const [messages, setMessages] = useState([]);
@@ -11,8 +12,9 @@ const Messages = () => {
 
     const fetchMessages = async () => {
         try {
-            const res = await fetch("/api/admin/messages");
-            if (res.ok) setMessages(await res.json());
+            const { data, error } = await supabase.from('messages').select('*').order('date', { ascending: false });
+            if (error) throw error;
+            setMessages(data);
         } catch (error) {
             console.error("Failed to fetch messages", error);
         }
@@ -21,8 +23,9 @@ const Messages = () => {
     const handleDelete = async (id) => {
         if (!window.confirm("Delete this message?")) return;
         try {
-            const res = await fetch(`/api/admin/messages/${id}`, { method: "DELETE" });
-            if (res.ok) fetchMessages();
+            const { error } = await supabase.from('messages').delete().eq('id', id);
+            if (error) throw error;
+            fetchMessages();
         } catch (error) {
             console.error(error);
         }
@@ -57,7 +60,7 @@ const Messages = () => {
                                         <h3 className="font-bold text-gray-900 dark:text-white">{msg.name}</h3>
                                         <p className="text-xs text-gray-500">{msg.email}</p>
                                     </div>
-                                    <span className="text-xs text-gray-400">{new Date(msg.timestamp || Date.now()).toLocaleDateString()}</span>
+                                    <span className="text-xs text-gray-400">{new Date(msg.date || Date.now()).toLocaleDateString()}</span>
                                 </div>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 flex-grow mb-4">
                                     "{msg.message}"

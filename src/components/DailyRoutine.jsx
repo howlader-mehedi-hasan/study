@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, BookOpen, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 export default function DailyRoutine() {
     const { isAdmin, user, hasPermission } = useAuth();
@@ -18,9 +19,8 @@ export default function DailyRoutine() {
             setLoading(true);
             try {
                 // Fetch Settings
-                const settingsRes = await fetch('/api/settings');
-                const settings = await settingsRes.json();
-                const switchTime = settings.routineSwitchTime || "18:00"; // Default 6 PM
+                const { data: settingsData } = await supabase.from('settings').select('*').single();
+                const switchTime = settingsData?.routine_switch_time || "18:00";
 
                 // Check Time for Auto-Advance
                 const now = new Date();
@@ -35,15 +35,13 @@ export default function DailyRoutine() {
                 }
                 setSelectedDate(initialDate);
 
-                // Fetch Schedule
-                const scheduleRes = await fetch('/api/schedule');
-                const schedule = await scheduleRes.json();
-                setScheduleData(schedule);
+                fetchSchedule();
 
                 // Fetch Holidays
-                const holidaysRes = await fetch('/api/holidays');
-                const holidaysData = await holidaysRes.json();
-                setHolidays(holidaysData);
+                const { data: holidaysData } = await supabase.from('holidays').select('*');
+                if (holidaysData) {
+                    setHolidays(holidaysData.map(h => ({ ...h, isCancelled: h.is_cancelled })));
+                }
 
             } catch (error) {
                 console.error("Failed to initialize routine", error);
@@ -55,11 +53,31 @@ export default function DailyRoutine() {
         init();
     }, []);
 
-    const fetchSchedule = () => { // Keep for updates
-        fetch('/api/schedule')
-            .then(res => res.json())
-            .then(data => setScheduleData(data))
-            .catch(console.error);
+    const fetchSchedule = async () => {
+        try {
+            const { data, error } = await supabase.from('schedule').select('*');
+            if (error) throw error;
+
+            const mapped = data.map(s => ({
+                id: s.id,
+                day: s.day,
+                startTime: s.start_time,
+                endTime: s.end_time,
+                type: s.type,
+                courseId: s.course_id,
+                courseName: s.course_name,
+                instructor: s.instructor,
+                room: s.room,
+                recurrence: s.recurrence,
+                color: s.color,
+                username: s.username,
+                isCancelled: s.is_cancelled
+            }));
+
+            setScheduleData(mapped);
+        } catch (error) {
+            console.error("Failed to fetch schedule", error);
+        }
     };
 
     // Helper: Go to previous day
@@ -82,18 +100,15 @@ export default function DailyRoutine() {
         const newStatus = !item.isCancelled;
 
         try {
-            const res = await fetch(`/api/schedule/${item.id}/cancel`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isCancelled: newStatus, username: user?.username })
-            });
+            const { error } = await supabase
+                .from('schedule')
+                .update({ is_cancelled: newStatus })
+                .eq('id', item.id);
 
-            if (res.ok) {
-                // Optimistic update or refetch
-                fetchSchedule();
-            } else {
-                alert("Failed to update status");
-            }
+            if (error) throw error;
+
+            // Optimistic update or refetch
+            fetchSchedule();
         } catch (error) {
             console.error("Error updating schedule", error);
         }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash, AlertCircle } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 const Complaints = () => {
     const [complaints, setComplaints] = useState([]);
@@ -11,8 +12,9 @@ const Complaints = () => {
 
     const fetchComplaints = async () => {
         try {
-            const res = await fetch("/api/admin/complaints");
-            if (res.ok) setComplaints(await res.json());
+            const { data, error } = await supabase.from('complaints').select('*').order('date', { ascending: false });
+            if (error) throw error;
+            setComplaints(data);
         } catch (error) {
             console.error("Failed to fetch complaints", error);
         }
@@ -21,8 +23,9 @@ const Complaints = () => {
     const handleDelete = async (id) => {
         if (!window.confirm("Delete this complaint?")) return;
         try {
-            const res = await fetch(`/api/admin/complaints/${id}`, { method: "DELETE" });
-            if (res.ok) fetchComplaints();
+            const { error } = await supabase.from('complaints').delete().eq('id', id);
+            if (error) throw error;
+            fetchComplaints();
         } catch (error) {
             console.error(error);
         }
@@ -59,8 +62,8 @@ const Complaints = () => {
                                             "{comp.description}"
                                         </p>
                                         <div className="flex gap-4 text-xs text-gray-500">
-                                            <span>From: {comp.anonymous ? "Anonymous" : comp.name || "Unknown"}</span>
-                                            <span>{new Date(comp.timestamp || Date.now()).toLocaleDateString()}</span>
+                                            <span>From: {comp.is_anonymous ? "Anonymous" : comp.name || "Unknown"}</span>
+                                            <span>{new Date(comp.date || Date.now()).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                     <button onClick={() => handleDelete(comp.id)} className="p-2 text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors">

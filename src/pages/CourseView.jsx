@@ -3,7 +3,13 @@ import { useParams, Link } from "react-router-dom";
 import { FileText, ArrowLeft, Download, Eye, HelpCircle, Upload, Check, Loader2, Plus, Trash2, Clock, Calendar, Pencil, BookOpen } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
-import courses from "../data/courses.json";
+import { supabase } from "../lib/supabaseClient";
+
+const safeDate = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+};
 
 export default function CourseView() {
     const { courseId } = useParams();
@@ -15,112 +21,49 @@ export default function CourseView() {
     const [uploading, setUploading] = useState(false);
     const [syllabus, setSyllabus] = useState(null);
 
-    const course = courses.find(c => c.id === courseId);
+    const [course, setCourse] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (course) {
-            fetch('/api/syllabus')
-                .then(res => res.json())
-                .then(data => {
-                    const syl = data.find(s => s.code === course.id);
-                    setSyllabus(syl);
-                })
-                .catch(err => console.error("Syllabus fetch error:", err));
-        }
-    }, [course]);
-
-    if (!course) {
-        return (
-            <div className="max-w-4xl mx-auto px-4 py-20 text-center">
-                <HelpCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Course Not Found</h2>
-                <p className="text-gray-500 dark:text-gray-400 mt-2 mb-8">The course you are looking for does not exist or has been removed.</p>
-                <Link to="/" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
-                    &larr; Return to Home
-                </Link>
-            </div>
-        );
-    }
-
-    const handleUpload = async (e) => {
-        e.preventDefault();
-        if (uploadFiles.length === 0) return;
-
-        setUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append("courseId", course.id);
-            formData.append("courseName", course.name);
-            formData.append("instructor", course.instructor);
-            formData.append("username", user.username); // Audit & Metadata
-
-            Array.from(uploadFiles).forEach(file => {
-                formData.append("files", file);
-            });
-
-            const response = await fetch("/api/courses", {
-                method: "POST",
-                body: formData,
-            });
-
-            if (response.ok) {
-                setUploadFiles([]);
-                alert("Files uploaded successfully! The page will reload to update the list.");
-                window.location.reload();
-            } else {
-                const data = await response.json();
-                alert(data.error || "Upload failed");
-            }
-        } catch (error) {
-            console.error(error);
-            alert("Error uploading files");
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleDelete = async (fileId) => {
-        if (!isAdmin) {
-            if (!window.confirm("Send deletion request for this file?")) return;
+        const fetchCourseData = async () => {
+            setLoading(true);
             try {
-                const response = await fetch("/api/deletion-requests", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "file",
-                        resourceId: fileId,
-                        details: { courseId: courseId, fileName: fileId },
-                        requestedBy: user.username
-                    })
-                });
-                if (response.ok) alert("Deletion request sent to Admin.");
-                else alert("Failed to send request.");
+                // Fetch Course & Files & Exams
+                const { data, error } = await supabase
+                    .from('courses')
+                    .select('*, files:course_files(*), exams(*)')
+                    .eq('id', courseId)
+                    .single();
+
+                if (error) throw error;
+                setCourse(data);
+
+                // Fetch Syllabus (independent table)
+                const { data: sylData } = await supabase
+                    .from('syllabus')
+                    .select('*')
+                    .eq('code', courseId)
+                    .single();
+
+                setSyllabus(sylData);
+
             } catch (err) {
-                alert("Failed to send request.");
+                console.error("Course fetch error:", err);
+            } finally {
+                setLoading(false);
             }
-            return;
-        }
+        };
 
-        if (!window.confirm("Are you sure you want to delete this file? This cannot be undone.")) {
-            return;
-        }
+        if (courseId) fetchCourseData();
+    }, [courseId]);
 
-        try {
-            const response = await fetch(`/api/courses/${courseId}/files/${fileId}`, {
-                method: "DELETE",
-            });
-
-            if (response.ok) {
-                alert("File deleted successfully");
-                window.location.reload();
-            } else {
-                const data = await response.json();
-                alert(data.error || "Delete failed");
-            }
-        } catch (error) {
-            console.error(error);
-            alert("Error deleting file");
-        }
+    const refreshCourse = async () => {
+        const { data } = await supabase
+            .from('courses')
+            .select('*, files:course_files(*), exams(*)')
+            .eq('id', courseId)
+            .single();
+        if (data) setCourse(data);
     };
 
     const [isAddingExam, setIsAddingExam] = useState(false);
@@ -139,10 +82,10 @@ export default function CourseView() {
         setIsEditing(true);
         setEditingExamId(exam.id);
         setNewExam({
-            title: exam.title,
-            date: exam.date,
-            time: exam.time,
-            syllabus: exam.syllabus
+            title: exam.title || '',
+            date: exam.date || '',
+            time: exam.time || '',
+            syllabus: exam.syllabus || ''
         });
         setIsAddingExam(true); // Open the form
     };
@@ -150,23 +93,15 @@ export default function CourseView() {
     const handleSaveExam = async (e) => {
         e.preventDefault();
         try {
-            const url = isEditing
-                ? `/api/courses/${courseId}/exams/${editingExamId}`
-                : `/api/courses/${courseId}/exams`;
+            const payload = { ...newExam, course_id: courseId };
+            if (isEditing) payload.id = editingExamId;
 
-            const method = isEditing ? 'PUT' : 'POST';
+            const { error } = await supabase.from('exams').upsert(payload);
+            if (error) throw error;
 
-            const response = await fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newExam, username: user.username }) // Ensure username sent on create/update
-            });
-            if (response.ok) {
-                alert(isEditing ? 'Exam updated successfully!' : 'Exam added successfully!');
-                window.location.reload();
-            } else {
-                alert('Failed to save exam');
-            }
+            alert(isEditing ? 'Exam updated successfully!' : 'Exam added successfully!');
+            resetExamForm();
+            refreshCourse();
         } catch (error) {
             console.error(error);
             alert('Error saving exam');
@@ -176,44 +111,152 @@ export default function CourseView() {
     const handleDeleteExam = async (examId) => {
         if (!isAdmin) {
             if (!window.confirm("Send deletion request for this exam?")) return;
+
             try {
-                const response = await fetch("/api/deletion-requests", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "exam",
-                        resourceId: examId,
-                        details: { courseId: courseId },
-                        requestedBy: user.username
-                    })
+                // Find exam details for the request
+                const exam = course.exams.find(e => e.id === examId);
+                const { error } = await supabase.from('deletion_requests').insert({
+                    type: 'exam',
+                    resource_id: examId,
+                    details: { name: exam ? exam.title : 'Unknown Exam' },
+                    requested_by: user.username,
+                    status: 'pending',
+                    date: new Date().toISOString()
                 });
-                if (response.ok) alert("Deletion request sent to Admin.");
-                else alert("Failed to send request.");
+
+                if (error) throw error;
+                alert("Deletion request sent successfully!");
             } catch (err) {
-                alert("Failed to send request.");
+                console.error("Error sending deletion request:", err);
+                alert("Failed to send deletion request.");
             }
             return;
         }
 
         if (!window.confirm('Are you sure?')) return;
         try {
-            const response = await fetch(`/api/courses/${courseId}/exams/${examId}`, {
-                method: 'DELETE'
-            });
-            if (response.ok) {
-                alert('Exam deleted successfully');
-                window.location.reload();
-            }
+            const { error } = await supabase.from('exams').delete().eq('id', examId);
+            if (error) throw error;
+            alert('Exam deleted successfully');
+            refreshCourse();
         } catch (error) {
             console.error(error);
         }
     };
 
+    const handleDelete = async (fileId) => {
+        if (!isAdmin) {
+            if (!window.confirm("Send deletion request for this file?")) return;
+
+            try {
+                // Find file details
+                const file = course.files.find(f => f.id === fileId);
+                const { error } = await supabase.from('deletion_requests').insert({
+                    type: 'file',
+                    resource_id: fileId,
+                    details: { name: file ? file.name : 'Unknown File' },
+                    requested_by: user.username,
+                    status: 'pending',
+                    date: new Date().toISOString()
+                });
+
+                if (error) throw error;
+                alert("Deletion request sent successfully!");
+            } catch (err) {
+                console.error("Error sending deletion request:", err);
+                alert("Failed to send deletion request.");
+            }
+            return;
+        }
+
+        if (!window.confirm("Are you sure you want to delete this file? This cannot be undone.")) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase.from('course_files').delete().eq('id', fileId);
+            if (error) throw error;
+
+            alert("File deleted successfully");
+            refreshCourse();
+        } catch (error) {
+            console.error(error);
+            alert("Error deleting file");
+        }
+    };
+
+    const handleUpload = async (e) => {
+        e.preventDefault();
+        if (uploadFiles.length === 0) return;
+
+        setUploading(true);
+        try {
+            const uploadedFiles = [];
+            for (let i = 0; i < uploadFiles.length; i++) {
+                const file = uploadFiles[i];
+                const fileName = `${courseId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('materials')
+                    .upload(fileName, file);
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage.from('materials').getPublicUrl(fileName);
+
+                const ext = file.name.split('.').pop().toLowerCase();
+                const type = ['jpg', 'jpeg', 'png'].includes(ext) ? 'image' : 'pdf';
+
+                uploadedFiles.push({
+                    course_id: courseId,
+                    name: file.name,
+                    type: type,
+                    path: publicUrl,
+                    uploaded_by: user.username,
+                    size: (file.size / 1024).toFixed(1) + ' KB'
+                });
+            }
+
+            const { error: dbError } = await supabase.from('course_files').insert(uploadedFiles);
+            if (dbError) throw dbError;
+
+            setUploadFiles([]);
+            alert("Files uploaded successfully!");
+            refreshCourse();
+
+        } catch (error) {
+            console.error(error);
+            alert(`Error uploading files: ${error.message}`);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+
+    if (loading) {
+        return <div className="p-12 text-center text-gray-500">Loading course...</div>;
+    }
+
+    if (!course) {
+        return (
+            <div className="max-w-4xl mx-auto px-4 py-20 text-center">
+                <HelpCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Course Not Found</h2>
+                <p className="text-gray-500 dark:text-gray-400 mt-2 mb-8">The course you are looking for does not exist or has been removed.</p>
+                <Link to="/" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
+                    &larr; Return to Home
+                </Link>
+            </div>
+        );
+    }
+
+
+
     // Countdown Helper
     const getTimeRemaining = (date, time) => {
-        const examDate = new Date(`${date}T${time}`); // Assumes ISO Date YYYY-MM-DD and Time HH:mm
-        // If time is "10:00 AM", we might need parsing. Let's assume input is HH:mm (24h) or force standard input.
-        // For simplicity, let's use standard Date input type which gives YYYY-MM-DD and Time input HH:mm
+        const examDate = safeDate(`${date}T${time}`);
+        if (!examDate) return null;
+
         const now = new Date();
         const diff = examDate - now;
 
@@ -227,8 +270,17 @@ export default function CourseView() {
     };
 
     // Sort exams by date
-    const upcomingExams = course.exams ? [...course.exams].sort((a, b) => new Date(a.date) - new Date(b.date)) : [];
-    const nextExam = upcomingExams.find(ex => new Date(`${ex.date}T${ex.time}`) > new Date());
+    const upcomingExams = course.exams ? [...course.exams].sort((a, b) => {
+        const dateA = safeDate(a.date) || new Date(0);
+        const dateB = safeDate(b.date) || new Date(0);
+        return dateA - dateB;
+    }) : [];
+
+    // Find next upcoming exam cleanly
+    const nextExam = upcomingExams.find(ex => {
+        const d = safeDate(`${ex.date}T${ex.time}`);
+        return d && d > new Date();
+    });
     const countdown = nextExam ? getTimeRemaining(nextExam.date, nextExam.time) : null;
 
     return (
@@ -310,7 +362,7 @@ export default function CourseView() {
                                 <h3 className="text-2xl font-bold">{nextExam.title}</h3>
                                 <div className="flex items-center mt-1 text-blue-100">
                                     <Calendar className="w-4 h-4 mr-1.5" />
-                                    <span className="mr-4">{new Date(nextExam.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                                    <span className="mr-4">{safeDate(nextExam.date)?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) || 'Date TBD'}</span>
                                     <Clock className="w-4 h-4 mr-1.5" />
                                     <span>{nextExam.time}</span>
                                 </div>
@@ -341,7 +393,7 @@ export default function CourseView() {
                             <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1 mb-3">
                                 <div className="flex items-center">
                                     <Calendar className="w-4 h-4 mr-2 text-blue-500" />
-                                    {new Date(exam.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {safeDate(exam.date)?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) || 'Date TBD'}
                                 </div>
                                 <div className="flex items-center">
                                     <Clock className="w-4 h-4 mr-2 text-blue-500" />
@@ -384,7 +436,7 @@ export default function CourseView() {
                                     placeholder="Exam Title (e.g., CT-1)"
                                     required
                                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
-                                    value={newExam.title}
+                                    value={newExam.title || ''}
                                     onChange={e => setNewExam({ ...newExam, title: e.target.value })}
                                 />
                                 <div className="flex gap-2">
@@ -392,14 +444,14 @@ export default function CourseView() {
                                         type="date"
                                         required
                                         className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
-                                        value={newExam.date}
+                                        value={newExam.date || ''}
                                         onChange={e => setNewExam({ ...newExam, date: e.target.value })}
                                     />
                                     <input
                                         type="time"
                                         required
                                         className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
-                                        value={newExam.time}
+                                        value={newExam.time || ''}
                                         onChange={e => setNewExam({ ...newExam, time: e.target.value })}
                                     />
                                 </div>
@@ -407,7 +459,7 @@ export default function CourseView() {
                                     type="text"
                                     placeholder="Syllabus (optional)"
                                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
-                                    value={newExam.syllabus}
+                                    value={newExam.syllabus || ''}
                                     onChange={e => setNewExam({ ...newExam, syllabus: e.target.value })}
                                 />
                                 <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
@@ -493,10 +545,10 @@ export default function CourseView() {
                                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-400 dark:text-gray-500 mt-1">
                                                 <span className="uppercase text-xs font-bold bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded text-gray-500 dark:text-gray-400">{file.type || 'PDF'}</span>
                                                 {file.size && <span>• {file.size}</span>}
-                                                {file.uploadedBy && (
+                                                {file.uploaded_by && (
                                                     <span className="text-xs text-gray-400 dark:text-gray-500">
-                                                        by <span className="font-medium text-gray-600 dark:text-gray-300">{file.uploadedBy}</span>
-                                                        {file.uploadDate && ` on ${new Date(file.uploadDate).toLocaleDateString()}`}
+                                                        by <span className="font-medium text-gray-600 dark:text-gray-300">{file.uploaded_by}</span>
+                                                        {file.created_at && ` on ${safeDate(file.created_at)?.toLocaleDateString() || ''}`}
                                                     </span>
                                                 )}
                                             </div>

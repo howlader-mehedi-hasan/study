@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Plus, Trash2, XCircle, CheckCircle, CalendarDays, Loader } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function Holidays() {
     const [holidays, setHolidays] = useState([]);
@@ -18,11 +19,9 @@ export default function Holidays() {
     const fetchHolidays = async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/holidays");
-            if (res.ok) {
-                const data = await res.json();
-                setHolidays(data.sort((a, b) => new Date(a.date) - new Date(b.date)));
-            }
+            const { data, error } = await supabase.from('holidays').select('*').order('date', { ascending: true });
+            if (error) throw error;
+            setHolidays(data);
         } catch (error) {
             console.error("Failed to fetch holidays", error);
         } finally {
@@ -33,16 +32,19 @@ export default function Holidays() {
     const handleAddHoliday = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch("/api/holidays", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newHoliday)
-            });
-            if (res.ok) {
-                setIsAdding(false);
-                setNewHoliday({ date: "", title: "", note: "" });
-                fetchHolidays();
-            }
+            const { error } = await supabase.from('holidays').insert([{
+                date: newHoliday.date,
+                title: newHoliday.title,
+                note: newHoliday.note,
+                type: 'custom',
+                is_cancelled: false
+            }]);
+
+            if (error) throw error;
+
+            setIsAdding(false);
+            setNewHoliday({ date: "", title: "", note: "" });
+            fetchHolidays();
         } catch (error) {
             console.error("Failed to add holiday", error);
         }
@@ -50,14 +52,9 @@ export default function Holidays() {
 
     const toggleCancellation = async (holiday) => {
         try {
-            const res = await fetch(`/api/holidays/${holiday.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isCancelled: !holiday.isCancelled })
-            });
-            if (res.ok) {
-                fetchHolidays();
-            }
+            const { error } = await supabase.from('holidays').update({ is_cancelled: !holiday.is_cancelled }).eq('id', holiday.id);
+            if (error) throw error;
+            fetchHolidays();
         } catch (error) {
             console.error("Failed to update holiday", error);
         }
@@ -66,12 +63,9 @@ export default function Holidays() {
     const handleDelete = async (id) => {
         if (!confirm("Are you sure you want to delete this holiday?")) return;
         try {
-            const res = await fetch(`/api/holidays/${id}`, {
-                method: "DELETE"
-            });
-            if (res.ok) {
-                fetchHolidays();
-            }
+            const { error } = await supabase.from('holidays').delete().eq('id', id);
+            if (error) throw error;
+            fetchHolidays();
         } catch (error) {
             console.error("Failed to delete holiday", error);
         }
@@ -189,18 +183,18 @@ export default function Holidays() {
                                     </td>
                                     <td className="p-4">
                                         <span className={`text-xs px-2 py-1 rounded-full ${holiday.type === 'default'
-                                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                                                : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                            : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
                                             }`}>
                                             {holiday.type}
                                         </span>
                                     </td>
                                     <td className="p-4">
-                                        <span className={`text-xs px-2 py-1 rounded-full flex items-center w-fit gap-1 ${holiday.isCancelled
-                                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                        <span className={`text-xs px-2 py-1 rounded-full flex items-center w-fit gap-1 ${holiday.is_cancelled
+                                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                                             }`}>
-                                            {holiday.isCancelled ? (
+                                            {holiday.is_cancelled ? (
                                                 <><XCircle className="w-3 h-3" /> Inactive</>
                                             ) : (
                                                 <><CheckCircle className="w-3 h-3" /> Active</>
@@ -212,7 +206,7 @@ export default function Holidays() {
                                             onClick={() => toggleCancellation(holiday)}
                                             className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                                         >
-                                            {holiday.isCancelled ? "Activate" : "Cancel"}
+                                            {holiday.is_cancelled ? "Activate" : "Cancel"}
                                         </button>
                                         <button
                                             onClick={() => handleDelete(holiday.id)}

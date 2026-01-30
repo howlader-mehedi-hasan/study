@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AlertCircle, Shield, CheckCircle, Send, FileWarning } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Complaints() {
     const [formData, setFormData] = useState({
@@ -18,18 +19,18 @@ export default function Complaints() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch('/api/complaints', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
+            const { error } = await supabase.from('complaints').insert([{
+                subject: formData.subject,
+                department: formData.department,
+                description: formData.description,
+                anonymous: formData.anonymous,
+                date: new Date().toISOString()
+            }]);
 
-            if (response.ok) {
-                setStatus('success');
-                setFormData({ subject: "", department: "General", description: "", anonymous: false });
-            } else {
-                setStatus('error');
-            }
+            if (error) throw error;
+
+            setStatus('success');
+            setFormData({ subject: "", department: "General", description: "", anonymous: false });
         } catch (err) {
             console.error(err);
             setStatus('error');

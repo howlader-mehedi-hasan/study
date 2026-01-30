@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash, RefreshCw, X, Shield, Search, Filter } from 'lucide-react';
+import { supabase } from "../../lib/supabaseClient";
 
 const ActivityLogs = () => {
     const [auditLogs, setAuditLogs] = useState([]);
@@ -15,8 +16,18 @@ const ActivityLogs = () => {
     const fetchAuditLogs = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("/api/admin/logs");
-            if (res.ok) setAuditLogs(await res.json());
+            const { data, error } = await supabase.from('audit_logs').select('*').order('date', { ascending: false });
+            if (error) throw error;
+            // Map Supabase columns to UI expected format
+            const mappedLogs = data.map(log => ({
+                id: log.id,
+                timestamp: log.date,
+                user: log.username,
+                action: log.action,
+                details: log.details,
+                type: 'info' // Default type since it wasn't in DB
+            }));
+            setAuditLogs(mappedLogs);
         } catch (error) {
             console.error("Failed to fetch logs", error);
         } finally {
@@ -41,30 +52,28 @@ const ActivityLogs = () => {
     const handleDeleteLog = async (id) => {
         if (!window.confirm("Delete this log entry?")) return;
         try {
-            const res = await fetch(`/api/admin/logs/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                setAuditLogs(prev => prev.filter(l => l.id !== id));
-                setSelectedLogs(prev => prev.filter(lId => lId !== id));
-            }
+            const { error } = await supabase.from('audit_logs').delete().eq('id', id);
+            if (error) throw error;
+
+            setAuditLogs(prev => prev.filter(l => l.id !== id));
+            setSelectedLogs(prev => prev.filter(lId => lId !== id));
         } catch (error) {
             console.error(error);
+            alert("Error deleting log");
         }
     };
 
     const handleDeleteSelectedLogs = async () => {
         if (!window.confirm(`Delete ${selectedLogs.length} selected logs?`)) return;
         try {
-            const res = await fetch('/api/admin/logs/batch-delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: selectedLogs })
-            });
-            if (res.ok) {
-                fetchAuditLogs();
-                setSelectedLogs([]);
-            }
+            const { error } = await supabase.from('audit_logs').delete().in('id', selectedLogs);
+            if (error) throw error;
+
+            fetchAuditLogs();
+            setSelectedLogs([]);
         } catch (error) {
             console.error(error);
+            alert("Error deleting logs");
         }
     };
 
@@ -74,13 +83,15 @@ const ActivityLogs = () => {
         if (password !== "admin123") return alert("Incorrect password"); // Simple check for MVP
 
         try {
-            const res = await fetch('/api/admin/logs', { method: 'DELETE' });
-            if (res.ok) {
-                setAuditLogs([]);
-                setSelectedLogs([]);
-            }
+            // Delete all rows
+            const { error } = await supabase.from('audit_logs').delete().neq('id', '0');
+            if (error) throw error;
+
+            setAuditLogs([]);
+            setSelectedLogs([]);
         } catch (error) {
             console.error(error);
+            alert("Error clearing logs");
         }
     };
 
@@ -185,8 +196,8 @@ const ActivityLogs = () => {
                                             </td>
                                             <td className="py-4 px-6">
                                                 <span className={`px-2 py-1 rounded-lg text-xs font-semibold max-w-xs truncate block ${log.type === 'error' ? 'bg-red-100 text-red-700' :
-                                                        log.type === 'warning' ? 'bg-amber-100 text-amber-700' :
-                                                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                    log.type === 'warning' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                                                     }`}>
                                                     {log.action}
                                                 </span>

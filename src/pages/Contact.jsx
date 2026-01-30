@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Mail, Phone, MapPin, Send, MessageSquare } from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Contact() {
     const [formData, setFormData] = useState({
@@ -16,18 +17,18 @@ export default function Contact() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch("/api/messages", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
-            });
+            const { error } = await supabase.from('messages').insert([{
+                name: formData.name,
+                email: formData.email,
+                subject: formData.subject,
+                message: formData.message
+            }]);
 
-            if (response.ok) {
-                alert(`Thank you, ${formData.name}! We have received your message.`);
-                setFormData({ name: "", email: "", subject: "", message: "" });
-            } else {
-                alert("Failed to send message. Please try again.");
-            }
+            if (error) throw error;
+
+            alert(`Thank you, ${formData.name}! We have received your message.`);
+            setFormData({ name: "", email: "", subject: "", message: "" });
+
         } catch (error) {
             console.error("Error sending message:", error);
             alert("An error occurred. Please try again later.");

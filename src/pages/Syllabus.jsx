@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BookOpen, FlaskConical, FileText, ChevronDown, ChevronUp, Clock, GraduationCap, Plus, Edit, Trash2, X, Save } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabaseClient";
 
 const CourseCard = ({ course, isAdmin, hasPermission, onEdit, onDelete }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -102,8 +103,8 @@ export default function Syllabus() {
 
     const fetchSyllabus = async () => {
         try {
-            const response = await fetch("/api/syllabus");
-            const data = await response.json();
+            const { data, error } = await supabase.from('syllabus').select('*').order('code', { ascending: true });
+            if (error) throw error;
             setSyllabusData(data);
         } catch (error) {
             console.error("Failed to fetch syllabus:", error);
@@ -114,20 +115,25 @@ export default function Syllabus() {
         if (!isAdmin) {
             if (!window.confirm("Send deletion request for this course?")) return;
             try {
-                const response = await fetch("/api/deletion-requests", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "syllabus",
-                        resourceId: code,
-                        details: { title: syllabusData.find(c => c.code === code)?.title || code },
-                        requestedBy: user.username
-                    })
+                // Find course details
+                const course = syllabusData.find(c => c.code === code);
+                const { error } = await supabase.from('deletion_requests').insert({
+                    type: 'syllabus',
+                    resource_id: code,
+                    details: {
+                        name: course ? course.title : 'Unknown Course',
+                        code: code
+                    },
+                    requested_by: user.username,
+                    status: 'pending',
+                    date: new Date().toISOString()
                 });
-                if (response.ok) alert("Deletion request sent to Admin.");
-                else alert("Failed to send request.");
+
+                if (error) throw error;
+                alert("Deletion request sent successfully!");
             } catch (err) {
-                alert("Failed to send request.");
+                console.error("Error sending deletion request:", err);
+                alert("Failed to send deletion request.");
             }
             return;
         }
@@ -135,16 +141,12 @@ export default function Syllabus() {
         if (!window.confirm("Are you sure you want to delete this course from the syllabus?")) return;
 
         try {
-            const response = await fetch(`/api/syllabus/${code}`, {
-                method: "DELETE",
-            });
-            if (response.ok) {
-                fetchSyllabus();
-            } else {
-                alert("Failed to delete course");
-            }
+            const { error } = await supabase.from('syllabus').delete().eq('code', code);
+            if (error) throw error;
+            fetchSyllabus();
         } catch (error) {
             console.error("Error deleting course:", error);
+            alert(`Error deleting: ${error.message}`);
         }
     };
 
@@ -170,22 +172,22 @@ export default function Syllabus() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch("/api/syllabus", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ ...formData, username: user.username }),
+            const { error } = await supabase.from('syllabus').upsert({
+                code: formData.code,
+                title: formData.title,
+                type: formData.type,
+                credit: formData.credit,
+                hours: formData.hours,
+                description: formData.description
             });
 
-            if (response.ok) {
-                setIsModalOpen(false);
-                fetchSyllabus();
-            } else {
-                alert("Failed to save course");
-            }
+            if (error) throw error;
+
+            setIsModalOpen(false);
+            fetchSyllabus();
         } catch (error) {
             console.error("Error saving course:", error);
+            alert("Failed to save course");
         }
     };
 
@@ -268,21 +270,14 @@ export default function Syllabus() {
                                             const file = e.target.files[0];
                                             if (!window.confirm(`Update CSE 4-1 syllabus PDF with "${file.name}"?`)) return;
 
-                                            const formData = new FormData();
-                                            formData.append('file', file);
-                                            formData.append('username', user.username); // Audit
-
                                             try {
-                                                const res = await fetch('/api/syllabus/pdf?type=4-1', {
-                                                    method: 'POST',
-                                                    body: formData
-                                                });
-                                                if (res.ok) {
-                                                    alert('Syllabus PDF updated successfully!');
-                                                    window.location.reload();
-                                                } else {
-                                                    alert('Failed to upload PDF');
-                                                }
+                                                const { error } = await supabase.storage
+                                                    .from('materials')
+                                                    .upload('syllabus/syllabus-4-1.pdf', file, { upsert: true });
+
+                                                if (error) throw error;
+                                                alert('Syllabus PDF updated successfully!');
+                                                // Ideally verify URL works
                                             } catch (err) {
                                                 console.error(err);
                                                 alert('Error uploading PDF');
@@ -329,21 +324,13 @@ export default function Syllabus() {
                                             const file = e.target.files[0];
                                             if (!window.confirm(`Update Complete CSE syllabus PDF with "${file.name}"?`)) return;
 
-                                            const formData = new FormData();
-                                            formData.append('file', file);
-                                            formData.append('username', user.username); // Audit
-
                                             try {
-                                                const res = await fetch('/api/syllabus/pdf?type=full', {
-                                                    method: 'POST',
-                                                    body: formData
-                                                });
-                                                if (res.ok) {
-                                                    alert('Syllabus PDF updated successfully!');
-                                                    window.location.reload();
-                                                } else {
-                                                    alert('Failed to upload PDF');
-                                                }
+                                                const { error } = await supabase.storage
+                                                    .from('materials')
+                                                    .upload('syllabus/syllabus-full.pdf', file, { upsert: true });
+
+                                                if (error) throw error;
+                                                alert('Syllabus PDF updated successfully!');
                                             } catch (err) {
                                                 console.error(err);
                                                 alert('Error uploading PDF');

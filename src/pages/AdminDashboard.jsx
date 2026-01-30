@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabaseClient";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu } from "lucide-react";
@@ -56,17 +57,17 @@ export default function AdminDashboard() {
         try {
             // Parallel fetch for dashboard stats
             const [usersRes, msgsRes, complaintsRes, opinionsRes] = await Promise.all([
-                fetch("/api/users"),
-                fetch("/api/admin/messages"),
-                fetch("/api/admin/complaints"),
-                fetch("/api/opinions")
+                supabase.from('users').select('*', { count: 'exact', head: true }),
+                supabase.from('messages').select('*', { count: 'exact', head: true }),
+                supabase.from('complaints').select('*', { count: 'exact', head: true }),
+                supabase.from('opinions').select('*', { count: 'exact', head: true })
             ]);
 
             setStats({
-                totalUsers: usersRes.ok ? (await usersRes.json()).length : 0,
-                totalMessages: msgsRes.ok ? (await msgsRes.json()).length : 0,
-                totalComplaints: complaintsRes.ok ? (await complaintsRes.json()).length : 0,
-                totalOpinions: opinionsRes.ok ? (await opinionsRes.json()).length : 0
+                totalUsers: usersRes.count || 0,
+                totalMessages: msgsRes.count || 0,
+                totalComplaints: complaintsRes.count || 0,
+                totalOpinions: opinionsRes.count || 0
             });
         } catch (error) {
             console.error("Failed to fetch dashboard stats", error);

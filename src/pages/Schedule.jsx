@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabaseClient";
 import {
     Calendar as CalendarIcon, Clock, MapPin, User, ChevronLeft, ChevronRight,
     Plus, Edit, Trash2, X, Save, Settings, Filter, LayoutGrid, List, CalendarDays, Check,
@@ -59,6 +60,26 @@ export default function Schedule() {
     const [routineUrl, setRoutineUrl] = useState("/routine.png");
     const [uploadingRoutine, setUploadingRoutine] = useState(false);
 
+    // Fetch Routine from Supabase
+    useEffect(() => {
+        const fetchRoutine = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('analog_routine')
+                    .select('image_url')
+                    .eq('id', 1)
+                    .single();
+
+                if (data && data.image_url) {
+                    setRoutineUrl(`${data.image_url}?t=${Date.now()}`);
+                }
+            } catch (error) {
+                console.error("Error fetching routine:", error);
+            }
+        };
+        fetchRoutine();
+    }, []);
+
     // Enhancement State
     const [filterText, setFilterText] = useState("");
     const [nextClass, setNextClass] = useState(null);
@@ -93,10 +114,15 @@ export default function Schedule() {
 
     const fetchHolidays = async () => {
         try {
-            const res = await fetch("/api/holidays");
-            const data = await res.json();
-            console.log("Fetched holidays:", data);
-            setHolidays(data);
+            const { data, error } = await supabase.from('holidays').select('*');
+            if (error) throw error;
+            // Map snake_case to camelCase
+            const mapped = data.map(h => ({
+                ...h,
+                isCancelled: h.is_cancelled
+            }));
+            console.log("Fetched holidays:", mapped);
+            setHolidays(mapped);
         } catch (error) {
             console.error("Failed to fetch holidays:", error);
         }
@@ -104,8 +130,25 @@ export default function Schedule() {
 
     const fetchSchedule = async () => {
         try {
-            const res = await fetch("/api/schedule");
-            setSchedule(await res.json());
+            const { data, error } = await supabase.from('schedule').select('*');
+            if (error) throw error;
+            // Map snake_case to camelCase
+            const mapped = data.map(s => ({
+                id: s.id,
+                day: s.day,
+                startTime: s.start_time,
+                endTime: s.end_time,
+                type: s.type,
+                courseId: s.course_id,
+                courseName: s.course_name,
+                instructor: s.instructor,
+                room: s.room,
+                recurrence: s.recurrence,
+                color: s.color,
+                username: s.username,
+                isCancelled: s.is_cancelled
+            }));
+            setSchedule(mapped);
         } catch (error) {
             console.error("Failed to fetch schedule:", error);
         }
@@ -113,8 +156,9 @@ export default function Schedule() {
 
     const fetchCourses = async () => {
         try {
-            const res = await fetch("/api/courses");
-            setCourses(await res.json());
+            const { data, error } = await supabase.from('courses').select('id, name, instructor');
+            if (error) throw error;
+            setCourses(data || []);
         } catch (error) {
             console.error("Failed to fetch courses:", error);
         }
@@ -122,11 +166,13 @@ export default function Schedule() {
 
     const fetchSettings = async () => {
         try {
-            const res = await fetch("/api/settings");
-            const data = await res.json();
-            if (data.visibleDays) setVisibleDays(data.visibleDays);
-            if (data.defaultScheduleView) {
-                setIsPrecisionMode(data.defaultScheduleView === 'precision');
+            const { data, error } = await supabase.from('settings').select('*').single();
+            if (error) throw error;
+            if (data) {
+                if (data.visible_days) setVisibleDays(data.visible_days);
+                if (data.default_schedule_view) {
+                    setIsPrecisionMode(data.default_schedule_view === 'precision');
+                }
             }
         } catch (error) {
             console.error("Failed to fetch settings:", error);
@@ -136,9 +182,26 @@ export default function Schedule() {
     // Calculate Next Class & Countdown
     useEffect(() => {
         const updateNextClass = () => {
+            // 1. Check for Holiday (using local date string match)
+            const now = new Date();
+            const offsetDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            const todayHoliday = holidays.find(h => h.date === offsetDate && !h.isCancelled);
+
+            if (todayHoliday) {
+                setNextClass({
+                    courseName: todayHoliday.title,
+                    instructor: todayHoliday.note || "No classes scheduled", // Re-using instructor field for note
+                    room: "Holiday",
+                    startTime: "All Day",
+                    status: 'holiday',
+                    isCancelled: false
+                });
+                setTimeRemaining("Enjoy your day off!");
+                return;
+            }
+
             if (!schedule.length) return;
 
-            const now = new Date();
             const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
             const currentTimeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
@@ -151,21 +214,25 @@ export default function Schedule() {
 
             if (current) {
                 setNextClass({ ...current, status: 'now' });
-                setTimeRemaining("In Progress");
+                setTimeRemaining(current.isCancelled ? "Cancelled" : "In Progress");
             } else if (upcoming) {
                 setNextClass({ ...upcoming, status: 'next' });
                 // Calc minutes remaining
-                const [h, m] = upcoming.startTime.split(':').map(Number);
-                const eventTime = new Date(now);
-                eventTime.setHours(h, m, 0);
-                const diff = Math.floor((eventTime - now) / 60000);
-
-                if (diff > 60) {
-                    const hours = Math.floor(diff / 60);
-                    const mins = diff % 60;
-                    setTimeRemaining(`Starts in ${hours}h ${mins}m`);
+                if (upcoming.isCancelled) {
+                    setTimeRemaining("Cancelled");
                 } else {
-                    setTimeRemaining(`Starts in ${diff} mins`);
+                    const [h, m] = upcoming.startTime.split(':').map(Number);
+                    const eventTime = new Date(now);
+                    eventTime.setHours(h, m, 0);
+                    const diff = Math.floor((eventTime - now) / 60000);
+
+                    if (diff > 60) {
+                        const hours = Math.floor(diff / 60);
+                        const mins = diff % 60;
+                        setTimeRemaining(`Starts in ${hours}h ${mins}m`);
+                    } else {
+                        setTimeRemaining(`Starts in ${diff} mins`);
+                    }
                 }
             } else {
                 setNextClass(null);
@@ -176,15 +243,15 @@ export default function Schedule() {
         updateNextClass();
         const interval = setInterval(updateNextClass, 60000); // Update every minute
         return () => clearInterval(interval);
-    }, [schedule]);
+    }, [schedule, holidays]);
 
     const saveSettings = async (newVisibleDays) => {
         try {
-            await fetch("/api/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ visibleDays: newVisibleDays })
+            const { error } = await supabase.from('settings').upsert({
+                id: 1, // Singleton
+                visible_days: newVisibleDays
             });
+            if (error) throw error;
             setVisibleDays(newVisibleDays);
         } catch (error) {
             console.error("Failed to save settings:", error);
@@ -238,28 +305,15 @@ export default function Schedule() {
     const handleDelete = async (id) => {
         if (!isAdmin) {
             if (!window.confirm("Send deletion request for this event?")) return;
-            try {
-                const response = await fetch("/api/deletion-requests", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        type: "schedule",
-                        resourceId: id,
-                        details: { title: schedule.find(s => s.id === id)?.courseName || "Event" },
-                        requestedBy: user.username
-                    })
-                });
-                if (response.ok) alert("Deletion request sent to Admin.");
-                else alert("Failed to send request.");
-            } catch (err) {
-                alert("Failed to send request.");
-            }
+            // Deletion request placeholder
+            alert("Deletion requests pending migration.");
             return;
         }
 
         if (!window.confirm("Delete this schedule entry?")) return;
         try {
-            await fetch(`/api/schedule/${id}`, { method: "DELETE" });
+            const { error } = await supabase.from('schedule').delete().eq('id', id);
+            if (error) throw error;
             fetchSchedule();
         } catch (error) {
             console.error("Error deleting event:", error);
@@ -269,15 +323,26 @@ export default function Schedule() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch("/api/schedule", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...formData, username: user.username })
-            });
-            if (res.ok) {
-                setIsModalOpen(false);
-                fetchSchedule();
-            }
+            const payload = {
+                id: formData.id,
+                day: formData.day,
+                start_time: formData.startTime,
+                end_time: formData.endTime,
+                type: formData.type,
+                course_id: formData.courseId,
+                course_name: formData.courseName,
+                instructor: formData.instructor,
+                room: formData.room,
+                recurrence: formData.recurrence,
+                color: formData.color,
+                username: user.username,
+                // created_at: new Date() // handled by default?
+            };
+
+            const { error } = await supabase.from('schedule').upsert(payload);
+            if (error) throw error;
+            setIsModalOpen(false);
+            fetchSchedule();
         } catch (error) {
             console.error("Error saving event:", error);
         }
@@ -314,19 +379,20 @@ export default function Schedule() {
     const handleHolidaySubmit = async (e) => {
         e.preventDefault();
         try {
-            const method = editingHoliday ? "PUT" : "POST";
-            const url = editingHoliday ? `/api/holidays/${editingHoliday.id}` : "/api/holidays";
+            const payload = {
+                id: holidayFormData.id || `hol-${Date.now()}`,
+                date: holidayFormData.date,
+                title: holidayFormData.title,
+                type: 'custom', // Defaulting to custom for new ones
+                note: holidayFormData.note,
+                is_cancelled: holidayFormData.isCancelled
+            };
 
-            const res = await fetch(url, {
-                method,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(holidayFormData)
-            });
+            const { error } = await supabase.from('holidays').upsert(payload);
 
-            if (res.ok) {
-                fetchHolidays();
-                setIsHolidayModalOpen(false);
-            }
+            if (error) throw error;
+            fetchHolidays();
+            setIsHolidayModalOpen(false);
         } catch (error) {
             console.error("Failed to save holiday:", error);
         }
@@ -335,7 +401,8 @@ export default function Schedule() {
     const handleHolidayDelete = async (id) => {
         if (!confirm("Are you sure you want to delete this holiday?")) return;
         try {
-            await fetch(`/api/holidays/${id}`, { method: "DELETE" });
+            const { error } = await supabase.from('holidays').delete().eq('id', id);
+            if (error) throw error;
             fetchHolidays();
             setIsHolidayModalOpen(false);
         } catch (error) {
@@ -348,26 +415,40 @@ export default function Schedule() {
         if (!file) return;
         if (!isAdmin) return alert("Unauthorized");
 
-        const formData = new FormData();
-        formData.append('file', file);
-
         setUploadingRoutine(true);
         try {
-            const res = await fetch("/api/schedule/routine", {
-                method: "POST",
-                body: formData
-            });
-            const data = await res.json();
-            if (res.ok) {
-                // Update URL with timestamp to force refresh
-                setRoutineUrl(`/routine.png?t=${data.timestamp}`);
-                alert("Routine updated successfully!");
-            } else {
-                alert("Failed to upload");
-            }
+            const filePath = `routine/routine_${Date.now()}.png`;
+
+            // 1. Upload to Storage
+            const { error: uploadError } = await supabase.storage
+                .from('materials')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            // 2. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('materials')
+                .getPublicUrl(filePath);
+
+            // 3. Update Table
+            const { error: dbError } = await supabase
+                .from('analog_routine')
+                .upsert({
+                    id: 1,
+                    image_url: publicUrl,
+                    uploaded_by: user.username,
+                    updated_at: new Date().toISOString()
+                });
+
+            if (dbError) throw dbError;
+
+            setRoutineUrl(`${publicUrl}?t=${Date.now()}`);
+            alert("Routine updated successfully!");
+
         } catch (error) {
-            console.error(error);
-            alert("Error uploading file");
+            console.error("Error updating routine:", error);
+            alert(`Error updating routine: ${error.message}`);
         } finally {
             setUploadingRoutine(false);
         }
@@ -513,25 +594,45 @@ export default function Schedule() {
                             <div className="flex items-center space-x-2 text-blue-100 mb-1">
                                 <Clock className="w-4 h-4" />
                                 <span className="text-sm font-medium uppercase tracking-wider">
-                                    {nextClass?.status === 'now' ? 'In Progress' : 'Next Up'}
+                                    {nextClass?.status === 'holiday' ? 'Holiday' :
+                                        nextClass?.status === 'now' ? 'In Progress' : 'Next Up'}
                                 </span>
                             </div>
                             {nextClass ? (
                                 <>
-                                    <h3 className="text-2xl font-bold mb-1">{nextClass.courseName || nextClass.courseId}</h3>
-                                    <p className="text-blue-100 flex items-center gap-3 text-sm">
-                                        <span className="flex items-center"><User className="w-3 h-3 mr-1" /> {nextClass.instructor}</span>
-                                        <span className="flex items-center bg-white/20 px-2 py-0.5 rounded-md"><MapPin className="w-3 h-3 mr-1" /> {nextClass.room}</span>
-                                    </p>
+                                    <h3 className="text-2xl font-bold mb-1 flex items-center flex-wrap gap-2">
+                                        {nextClass.courseName || nextClass.courseId}
+                                        {nextClass.isCancelled && (
+                                            <span className="bg-red-500/80 text-white text-xs px-2 py-1 rounded-lg uppercase tracking-wider font-bold shadow-sm">
+                                                Cancelled
+                                            </span>
+                                        )}
+                                    </h3>
+                                    {nextClass.status === 'holiday' ? (
+                                        <p className="text-blue-100 text-sm mt-1 flex items-center gap-2">
+                                            <CalendarIcon className="w-4 h-4" />
+                                            {nextClass.instructor}
+                                        </p>
+                                    ) : (
+                                        <p className="text-blue-100 flex items-center gap-3 text-sm">
+                                            <span className="flex items-center"><User className="w-3 h-3 mr-1" /> {nextClass.instructor}</span>
+                                            <span className="flex items-center bg-white/20 px-2 py-0.5 rounded-md"><MapPin className="w-3 h-3 mr-1" /> {nextClass.room}</span>
+                                        </p>
+                                    )}
                                 </>
                             ) : (
                                 <h3 className="text-xl font-medium opacity-90">No more classes scheduled for today!</h3>
                             )}
                         </div>
                         {nextClass && (
-                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center min-w-[120px] border border-white/20">
-                                <div className="text-2xl font-bold">{nextClass.status === 'now' ? 'Now' : nextClass.startTime}</div>
-                                <div className="text-xs text-blue-200">{timeRemaining}</div>
+                            <div className={`backdrop-blur-sm rounded-xl p-4 text-center min-w-[120px] border border-white/20 ${nextClass.isCancelled ? 'bg-red-500/20' : 'bg-white/10'}`}>
+                                <div className="text-2xl font-bold">
+                                    {nextClass.status === 'now' ? 'Now' :
+                                        nextClass.status === 'holiday' ? 'All Day' : nextClass.startTime}
+                                </div>
+                                <div className={`text-xs ${nextClass.isCancelled ? 'text-red-200 font-bold' : 'text-blue-200'}`}>
+                                    {timeRemaining}
+                                </div>
                             </div>
                         )}
                     </div>
