@@ -1,0 +1,219 @@
+You are an expert full-stack developer. Your task is to replicate the following project exactly, but using **React** (Vite) for the frontend, **Node.js** (Express) for the backend, **MongoDB** (Mongoose) for the database, and **Cloudinary** for image/file storage.
+
+## Project Overview
+- **Deployment**: The app is designed to be hosted on Vercel (frontend) and a cloud platform (backend), or as a combined deployment.
+- **Frontend**: React, Tailwind CSS, Lucide React (icons), Framer Motion.
+- **Backend**: Express.js, Mongoose (MongoDB ODM), Cloudinary (File Uploads), Multer (storage engine).
+- **Features**: 
+  - Role-based Authentication (Admin, Editor, User).
+  - Dark/Light Mode.
+  - Course File Management (Upload/Delete via Cloudinary).
+  - Dynamic Schedule/Routine.
+  - Notice Board.
+  - Syllabus Management.
+  - Admin Dashboard for global settings and user management.
+  - **Database**: MongoDB (Atlas).
+  - **Storage**: Cloudinary (Assets/PDFs).
+
+## 1. Project Root Configuration
+
+### `package.json`
+```json
+{
+  "name": "classmaterials",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm:server\" \"npm:client\"",
+    "client": "vite",
+    "server": "node server.js",
+    "build": "vite build",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "cloudinary": "^2.2.0",
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
+    "date-fns": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "framer-motion": "^11.2.10",
+    "lucide-react": "^0.394.0",
+    "mongoose": "^8.4.1",
+    "multer": "^1.4.5-lts.1",
+    "multer-storage-cloudinary": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.23.1",
+    "tailwind-merge": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.2",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.3.1"
+  }
+}
+```
+
+### `.env` (Template)
+```
+PORT=3001
+MONGODB_URI=your_mongodb_connection_string
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+JWT_SECRET=your_jwt_secret_optional
+```
+
+## 2. Backend Server
+
+### `server.js` (Structure Guidance)
+You should implement the server using **Mongoose** for data interactions and **Cloudinary** for file uploads.
+
+```javascript
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Database Connection
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('Connected to MongoDB'))
+    .catch(err => console.error('MongoDB error:', err));
+
+// Cloudinary Config
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'course-materials',
+        resource_type: 'auto', // for pdfs, images, etc.
+    },
+});
+const upload = multer({ storage: storage });
+
+// --- MONGOOSE SCHEMAS (Define these in separate files if possible, or here) ---
+
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true }, // Ideally hashed
+    name: String,
+    role: { type: String, default: 'user' },
+    permissions: Object
+});
+const User = mongoose.model('User', UserSchema);
+
+const CourseSchema = new mongoose.Schema({
+    id: String, // Keep the custom ID if needed for UI, or use _id
+    name: String,
+    instructor: String,
+    files: [{
+        name: String,
+        path: String, // Cloudinary URL
+        publicId: String, // Cloudinary Public ID
+        type: String,
+        size: String,
+        uploadDate: Date,
+        uploadedBy: String
+    }],
+    exams: [{
+        id: String,
+        title: String,
+        date: String,
+        time: String,
+        syllabus: String
+    }]
+});
+const Course = mongoose.model('Course', CourseSchema);
+
+const AuditLogSchema = new mongoose.Schema({
+    action: String,
+    details: String,
+    timestamp: { type: Date, default: Date.now }
+});
+const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
+
+// ... Define schemas for Syllabus, Notices, Schedule, Settings ...
+
+// --- ROUTES ---
+
+// Example: Courses
+app.get('/api/courses', async (req, res) => {
+    try {
+        const courses = await Course.find();
+        res.json(courses);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/courses', upload.array('files'), async (req, res) => {
+    // Logic to find course by courseId or create new
+    // If files, map `req.files` (cloudinary props) to schema structure
+    // save to DB
+    // Log to AuditLog
+});
+
+app.delete('/api/courses/:courseId/files/:fileId', async (req, res) => {
+    // Find course, find file
+    // cloudinary.uploader.destroy(file.publicId)
+    // Pull file from course.files array
+    // Save course
+});
+
+// ... Implement other CRUD routes (Auth, Settings, etc.) using Mongoose ...
+
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+```
+
+## 3. Frontend Source (`src/`)
+
+The frontend code remains largely the same as the React implementation, but ensure that when `fetch` calls are made, they expect the backend to behave as a REST API backed by MongoDB. The response structures should remain consistent with what the frontend expects (e.g., returning arrays of objects).
+
+### Key Frontend Components to Maintain
+- `src/App.jsx`
+- `src/contexts/AuthContext.jsx` (Ensure it hits `/api/auth/login`)
+- `src/pages/*.jsx` (Courses, Schedule, etc.)
+
+## Instructions for AI Agent
+1. **Initialize Project**: `npm create vite@latest .` -> React -> Javascript.
+2. **Install Deps**: 
+   - Backend: `npm install express mongoose width cloudinary multer multer-storage-cloudinary cors dotenv`
+   - Frontend: `npm install react-router-dom lucide-react framer-motion clsx tailwind-merge date-fns`
+   - Dev: `npm install -D tailwindcss postcss autoprefixer concurrently`
+3. **Setup Tailwind**: `npx tailwindcss init -p`.
+4. **Backend Implementation**:
+   - Create `server.js`.
+   - Implement Mongoose schemas for `User`, `Course`, `Notice`, `Syllabus`, `Schedule`, `Settings`, `AuditLog`, `Message`, `Complaint`, `Opinion`.
+   - Implement API routes connected to MongoDB.
+   - Configure Cloudinary for file uploads.
+5. **Frontend Implementation**: 
+   - Replicate the React components and pages as described in the original project structure.
+   - Ensure specific Admin functionalities (add/edit/delete) interact correctly with the new backend API.
+6. **Environment**: Create a `.env` file with placeholders for Mongo URI and Cloudinary credentials.

@@ -1,0 +1,15 @@
+{
+    "welcomeMessage": "",
+    "visibleDays": [
+        "Saturday",
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+    ],
+    "defaultScheduleView": "classic",
+    "routineSwitchTime": "18:00",
+    "breakingNews": ""
+}

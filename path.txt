@@ -1,0 +1,80 @@
+.
+├── dist
+│   ├── assets
+│   │   ├── index-3_QeGzgn.js
+│   │   └── index-CAf0RZ_A.css
+│   ├── index.html
+│   └── vite.svg
+├── eslint.config.js
+├── index.html
+├── package.json
+├── package-lock.json
+├── postcss.config.js
+├── public
+│   ├── materials
+│   │   ├── CSE-4101
+│   │   │   ├── 772460.pdf
+│   │   │   └── AI-Short-Course-Sample-Material.pdf
+│   │   ├── CSE-4103
+│   │   ├── CSE-4105
+│   │   │   └── BackPropDeriv.pdf
+│   │   └── CSE-4116
+│   │       ├── ANN-Lecture-1.pdf
+│   │       └── ML UNIT-1 NOTES.pdf
+│   ├── notices
+│   │   ├── notice-1768578420381.pdf
+│   │   └── notice-1768654444606.pdf
+│   ├── syllabus-4-1.pdf
+│   ├── syllabus.pdf
+│   └── vite.svg
+├── README.md
+├── README.txt
+├── server_debug.log
+├── server_final.log
+├── server.js
+├── src
+│   ├── App.css
+│   ├── App.jsx
+│   ├── assets
+│   │   └── react.svg
+│   ├── components
+│   │   ├── DailyRoutine.jsx
+│   │   ├── Footer.jsx
+│   │   ├── Navbar.jsx
+│   │   └── PDFViewer.jsx
+│   ├── contents
+│   │   ├── NWU-CSE.pdf
+│   │   ├── RoutineV1.png
+│   │   └── Syllabus_NWU_CSE_4-1.pdf
+│   ├── contexts
+│   │   ├── AuthContext.jsx
+│   │   └── ThemeContext.jsx
+│   ├── data
+│   │   ├── audit_logs.json
+│   │   ├── complaints.json
+│   │   ├── courses.json
+│   │   ├── deletion_requests.json
+│   │   ├── notices.json
+│   │   ├── opinions.json
+│   │   ├── schedule.json
+│   │   ├── settings.json
+│   │   ├── syllabus.json
+│   │   └── users.json
+│   ├── index.css
+│   ├── lib
+│   │   └── utils.js
+│   ├── main.jsx
+│   └── pages
+│       ├── About.jsx
+│       ├── AdminDashboard.jsx
+│       ├── Complaints.jsx
+│       ├── Contact.jsx
+│       ├── Courses.jsx
+│       ├── CourseView.jsx
+│       ├── Home.jsx
+│       ├── Notices.jsx
+│       ├── Opinions.jsx
+│       ├── Schedule.jsx
+│       └── Syllabus.jsx
+├── tailwind.config.js
+└── vite.config.js

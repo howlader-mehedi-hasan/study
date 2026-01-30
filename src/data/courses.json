@@ -1,0 +1,85 @@
+[
+    {
+        "id": "CSE-4101",
+        "name": "Artifical Intelligance",
+        "instructor": "Swapnil Pranta Misteri",
+        "files": [
+            {
+                "id": "file-1768698329963-846",
+                "name": "772460.pdf",
+                "type": "pdf",
+                "path": "/materials/CSE-4101/772460.pdf"
+            },
+            {
+                "id": "file-1768702539977-429",
+                "name": "AI-Short-Course-Sample-Material.pdf",
+                "type": "pdf",
+                "path": "/materials/CSE-4101/AI-Short-Course-Sample-Material.pdf"
+            },
+            {
+                "id": "file-1768770854605-858",
+                "name": "7QTdhc1OoYItyQFFf6qNmFG6ro6.jpg",
+                "type": "image",
+                "path": "/materials/CSE-4101/7QTdhc1OoYItyQFFf6qNmFG6ro6.jpg",
+                "uploadedBy": "hmh",
+                "uploadDate": "2026-01-18T21:14:14.605Z"
+            }
+        ],
+        "exams": []
+    },
+    {
+        "id": "CSE-4103",
+        "name": "Compailer Design",
+        "instructor": "Nusrat Jahan Urme",
+        "files": []
+    },
+    {
+        "id": "CSE-4105",
+        "name": "Information And Security Control",
+        "instructor": "Istyaque Ahammed",
+        "files": [
+            {
+                "id": "file-1768708521351-204",
+                "name": "BackPropDeriv.pdf",
+                "type": "pdf",
+                "path": "/materials/CSE-4105/BackPropDeriv.pdf"
+            }
+        ]
+    },
+    {
+        "id": "CSE-4119",
+        "name": "Machine Learning",
+        "instructor": "Prof. Dr. G M Atiqur Rahaman (CSE, KU)",
+        "files": []
+    },
+    {
+        "id": "CSE-4117",
+        "name": "Computer Vision and Image Processing",
+        "instructor": "Tahsin Ahmed Chowdhury",
+        "files": []
+    },
+    {
+        "id": "CSE-4102",
+        "name": "Artificial Intelligence Laboratory",
+        "instructor": "Swapnil Pranta Misteri",
+        "files": []
+    },
+    {
+        "id": "CSE-4104",
+        "name": "Compiler Design Laboratory",
+        "instructor": "Nusrat Jahan Urme",
+        "files": []
+    },
+    {
+        "id": "CSE-4118",
+        "name": "Computer Vision and Image Processing Laboratory",
+        "instructor": "Md. Mahamudul Hasan",
+        "files": []
+    },
+    {
+        "id": "CSE-4120",
+        "name": "Machine Learning Laboratory",
+        "instructor": "Nazirul Hasan Shawon (CSE, KUET)",
+        "files": []
+    }
+]

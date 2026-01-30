@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #2563eb;
+  --color-secondary: #475569;
+  --color-accent: #f59e0b;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  @keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+  
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+    white-space: nowrap;
+  }
+  
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+}
