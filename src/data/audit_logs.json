@@ -1,5 +1,40 @@
 [
     {
+        "id": "log-1769790661032-254",
+        "date": "2026-01-30T16:31:01.032Z",
+        "action": "UPDATE_SCHEDULE",
+        "username": "admin",
+        "details": "Schedule event: Computer Vision and Image Processing Laboratory"
+    },
+    {
+        "id": "log-1769779081262-202",
+        "date": "2026-01-30T13:18:01.262Z",
+        "action": "CREATE_HOLIDAY",
+        "username": "Admin",
+        "details": "Added holiday: test on 2026-01-28"
+    },
+    {
+        "id": "log-1769778818399-478",
+        "date": "2026-01-30T13:13:38.399Z",
+        "action": "CREATE_HOLIDAY",
+        "username": "Admin",
+        "details": "Added holiday: icpc on 2026-01-23"
+    },
+    {
+        "id": "log-1769778735439-85",
+        "date": "2026-01-30T13:12:15.439Z",
+        "action": "CREATE_HOLIDAY",
+        "username": "Admin",
+        "details": "Added holiday: tour on 2026-01-31"
+    },
+    {
+        "id": "log-1769778199012-256",
+        "date": "2026-01-30T13:03:19.012Z",
+        "action": "CREATE_HOLIDAY",
+        "username": "Admin",
+        "details": "Added holiday: Pitha Fastival - 2026 on 2026-02-02"
+    },
+    {
         "id": "log-1769763609044-267",
         "date": "2026-01-30T09:00:09.044Z",
         "action": "CREATE_NOTICE",

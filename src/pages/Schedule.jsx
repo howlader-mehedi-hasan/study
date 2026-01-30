@@ -47,6 +47,7 @@ const FRIDAY_SLOTS = [
 export default function Schedule() {
     const { user, isAdmin, hasPermission } = useAuth();
     const [schedule, setSchedule] = useState([]);
+    const [holidays, setHolidays] = useState([]);
     const [courses, setCourses] = useState([]);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState("week"); // week, day, month
@@ -62,6 +63,11 @@ export default function Schedule() {
     const [filterText, setFilterText] = useState("");
     const [nextClass, setNextClass] = useState(null);
     const [timeRemaining, setTimeRemaining] = useState("");
+
+    // Holiday Modal State
+    const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+    const [holidayFormData, setHolidayFormData] = useState({ id: "", date: "", title: "", note: "", isCancelled: false });
+    const [editingHoliday, setEditingHoliday] = useState(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -80,9 +86,21 @@ export default function Schedule() {
 
     useEffect(() => {
         fetchSchedule();
+        fetchHolidays();
         fetchCourses();
         fetchSettings();
     }, []);
+
+    const fetchHolidays = async () => {
+        try {
+            const res = await fetch("/api/holidays");
+            const data = await res.json();
+            console.log("Fetched holidays:", data);
+            setHolidays(data);
+        } catch (error) {
+            console.error("Failed to fetch holidays:", error);
+        }
+    };
 
     const fetchSchedule = async () => {
         try {
@@ -277,6 +295,51 @@ export default function Schedule() {
             });
         } else {
             setFormData({ ...formData, courseId: "", courseName: "", instructor: "" });
+        }
+    };
+
+    // Holiday Handlers
+    const openHolidayModal = (date, holiday = null) => {
+        setEditingHoliday(holiday);
+        setHolidayFormData({
+            id: holiday ? holiday.id : "",
+            date: date,
+            title: holiday ? holiday.title : "",
+            note: holiday ? holiday.note : "",
+            isCancelled: holiday ? holiday.isCancelled : false
+        });
+        setIsHolidayModalOpen(true);
+    };
+
+    const handleHolidaySubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const method = editingHoliday ? "PUT" : "POST";
+            const url = editingHoliday ? `/api/holidays/${editingHoliday.id}` : "/api/holidays";
+
+            const res = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(holidayFormData)
+            });
+
+            if (res.ok) {
+                fetchHolidays();
+                setIsHolidayModalOpen(false);
+            }
+        } catch (error) {
+            console.error("Failed to save holiday:", error);
+        }
+    };
+
+    const handleHolidayDelete = async (id) => {
+        if (!confirm("Are you sure you want to delete this holiday?")) return;
+        try {
+            await fetch(`/api/holidays/${id}`, { method: "DELETE" });
+            fetchHolidays();
+            setIsHolidayModalOpen(false);
+        } catch (error) {
+            console.error("Failed to delete holiday:", error);
         }
     };
 
@@ -823,15 +886,53 @@ export default function Schedule() {
                         ))}
                         {Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate() }).map((_, i) => {
                             const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), i + 1);
+
+                            // Check for Holiday
+                            const dateString = d.toISOString().split('T')[0]; // Simple YYYY-MM-DD
+                            // Adjust for timezone offset issue if necessary, but holidays are stored as YYYY-MM-DD string usually.
+                            // Let's ensure simple string comparison.
+                            const offsetDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+
+                            const holiday = holidays.find(h => h.date === offsetDate && !h.isCancelled);
                             const events = getEventsForDay(d);
                             const isToday = d.toDateString() === new Date().toDateString();
 
                             return (
-                                <div key={i} className={`h-24 md:h-32 border dark:border-slate-700 bg-white dark:bg-slate-800 p-1 md:p-2 overflow-y-auto rounded-lg ${isToday ? 'ring-2 ring-blue-500' : ''}`}>
+                                <div key={i} className={`h-24 md:h-32 border dark:border-slate-700 p-1 md:p-2 overflow-y-auto rounded-lg transition-colors ${holiday
+                                    ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30'
+                                    : 'bg-white dark:bg-slate-800'
+                                    } ${isToday ? 'ring-2 ring-blue-500' : ''}`}>
                                     <div className={`text-right text-xs font-bold mb-1 ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>{i + 1}</div>
+
+                                    {holiday && (
+                                        <div className="mb-2 p-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 text-xs rounded font-medium text-center relative group">
+                                            {holiday.title}
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); openHolidayModal(offsetDate, holiday); }}
+                                                    className="absolute -top-1 -right-1 bg-white dark:bg-slate-700 rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <Edit className="w-3 h-3 text-gray-600 dark:text-gray-300" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {!holiday && isAdmin && (
+                                        <div className="flex justify-end opacity-0 hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openHolidayModal(offsetDate); }}
+                                                className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-gray-400 hover:text-blue-500"
+                                                title="Add Holiday"
+                                            >
+                                                <Plus className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {events.map(ev => (
                                         <div key={ev.id} className={`text-[10px] p-1 rounded mb-1 truncate ${ev.color} ${ev.type === 'Class' ? 'text-blue-800 dark:text-blue-100' : 'text-gray-700 dark:text-gray-200'}`}>
-                                            {ev.startTime} {ev.courseId ? `${ev.courseId} (${ev.type})` : ev.type} {ev.room && `[${ev.room}]`}
+                                            {ev.startTime} {ev.courseId ? `${ev.courseId}` : ev.type}
                                         </div>
                                     ))}
                                 </div>
@@ -1071,6 +1172,86 @@ export default function Schedule() {
                                         <Save className="w-4 h-4 mr-2" />
                                         Save Class
                                     </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Holiday Modal */}
+            {
+                isHolidayModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                            <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                                <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                                    {editingHoliday ? "Edit Holiday" : "Add Holiday"}
+                                </h2>
+                                <button onClick={() => setIsHolidayModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                            <form onSubmit={handleHolidaySubmit} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                                    <input
+                                        type="date"
+                                        value={holidayFormData.date}
+                                        onChange={e => setHolidayFormData({ ...holidayFormData, date: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                                    <input
+                                        type="text"
+                                        value={holidayFormData.title}
+                                        onChange={e => setHolidayFormData({ ...holidayFormData, title: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note</label>
+                                    <input
+                                        type="text"
+                                        value={holidayFormData.note}
+                                        onChange={e => setHolidayFormData({ ...holidayFormData, note: e.target.value })}
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                {editingHoliday && (
+                                    <div className="flex items-center space-x-2 mt-2">
+                                        <input
+                                            type="checkbox"
+                                            id="isCancelled"
+                                            checked={holidayFormData.isCancelled}
+                                            onChange={e => setHolidayFormData({ ...holidayFormData, isCancelled: e.target.checked })}
+                                            className="w-4 h-4 text-blue-600 rounded"
+                                        />
+                                        <label htmlFor="isCancelled" className="text-sm text-gray-700 dark:text-gray-300">
+                                            Cancel this holiday (make active day)
+                                        </label>
+                                    </div>
+                                )}
+                                <div className="pt-4 flex justify-between border-t border-gray-100 dark:border-slate-700 mt-4">
+                                    {editingHoliday ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleHolidayDelete(editingHoliday.id)}
+                                            className="text-red-500 hover:text-red-700 text-sm font-medium"
+                                        >
+                                            Delete
+                                        </button>
+                                    ) : <div></div>}
+                                    <div className="flex space-x-3">
+                                        <button type="button" onClick={() => setIsHolidayModalOpen(false)} className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg">Cancel</button>
+                                        <button type="submit" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg shadow-blue-200 dark:shadow-none font-medium">
+                                            Save
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </div>

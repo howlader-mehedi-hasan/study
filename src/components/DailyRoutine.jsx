@@ -6,6 +6,7 @@ export default function DailyRoutine() {
     const { isAdmin, user, hasPermission } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [scheduleData, setScheduleData] = useState([]);
+    const [holidays, setHolidays] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isAutoAdvanced, setIsAutoAdvanced] = useState(false);
 
@@ -38,6 +39,11 @@ export default function DailyRoutine() {
                 const scheduleRes = await fetch('/api/schedule');
                 const schedule = await scheduleRes.json();
                 setScheduleData(schedule);
+
+                // Fetch Holidays
+                const holidaysRes = await fetch('/api/holidays');
+                const holidaysData = await holidaysRes.json();
+                setHolidays(holidaysData);
 
             } catch (error) {
                 console.error("Failed to initialize routine", error);
@@ -93,18 +99,46 @@ export default function DailyRoutine() {
         }
     };
 
-    // Filter schedule for the selected day
+    // Helper to get week number
+    const getWeekNumber = (d) => {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        return weekNo;
+    };
+
+    // Filter schedule for the selected day with Recurrence Logic
     const todaysClasses = useMemo(() => {
         const dayName = days[selectedDate.getDay()];
+        const weekNum = getWeekNumber(selectedDate);
+        const isOddWeek = weekNum % 2 !== 0;
+
         return scheduleData
-            .filter(item => item.day === dayName)
+            .filter(item => {
+                if (item.day !== dayName) return false;
+
+                // Recurrence Check
+                if (item.recurrence === "odd" && !isOddWeek) return false;
+                if (item.recurrence === "even" && isOddWeek) return false;
+
+                return true;
+            })
             .sort((a, b) => {
-                // Simple string comparison works for 24h format "09:00" vs "10:00"
                 return a.startTime.localeCompare(b.startTime);
             });
     }, [selectedDate, scheduleData]);
 
     const isToday = new Date().toDateString() === selectedDate.toDateString();
+
+    // Check if selected date is a holiday
+    const currentHoliday = useMemo(() => {
+        // Adjust date to match holiday format (YYYY-MM-DD)
+        const dateString = selectedDate.toISOString().split('T')[0];
+        // Ensure accurate local date string
+        const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+        return holidays.find(h => h.date === offsetDate && !h.isCancelled);
+    }, [selectedDate, holidays]);
 
     // Helper: Format time to 12H
     const formatTime = (time24) => {
@@ -161,7 +195,18 @@ export default function DailyRoutine() {
 
             {/* Timeline */}
             <div className="space-y-4">
-                {todaysClasses.length > 0 ? (
+                {currentHoliday ? (
+                    <div className="text-center py-8 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <Calendar className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-1">{currentHoliday.title}</h3>
+                        <p className="text-sm text-red-600 dark:text-red-300 opacity-80">Holiday</p>
+                        {currentHoliday.note && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 italic px-6">"{currentHoliday.note}"</p>
+                        )}
+                    </div>
+                ) : todaysClasses.length > 0 ? (
                     todaysClasses.map(item => (
                         <div key={item.id} className="relative pl-4 border-l-2 border-gray-100 dark:border-slate-700 last:pb-0 pb-4">
                             {/* Dot indicator */}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layout, Users, Key, Inbox, Mail, AlertCircle, MessageSquare, FileText, HardDrive, X, Menu, LogOut } from 'lucide-react';
+import { Layout, Users, Key, Inbox, Mail, AlertCircle, MessageSquare, FileText, HardDrive, X, Menu, LogOut, CalendarDays } from 'lucide-react';
 
 const Sidebar = ({
     activeTab,
@@ -14,6 +14,7 @@ const Sidebar = ({
 
     const menuItems = [
         { id: 'overview', label: 'Overview', icon: Layout, show: true },
+        { id: 'holidays', label: 'Holidays', icon: CalendarDays, show: isAdmin || permissions?.schedule_edit },
         { id: 'settings', label: 'Global Settings', icon: HardDrive, show: isAdmin || permissions?.welcome_message_edit || permissions?.schedule_edit || permissions?.breaking_news_edit },
         { id: 'users', label: 'User Management', icon: Users, show: isAdmin },
         { id: 'profile', label: 'My Profile', icon: Key, show: true },

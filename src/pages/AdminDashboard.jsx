@@ -16,6 +16,7 @@ import DeletionRequests from "../components/admin/DeletionRequests";
 import Messages from "../components/admin/Messages";
 import Complaints from "../components/admin/Complaints";
 import Opinions from "../components/admin/Opinions";
+import Holidays from "../components/admin/Holidays";
 
 export default function AdminDashboard() {
     const { user, isAdmin, login, logout } = useAuth();
@@ -147,6 +148,7 @@ export default function AdminDashboard() {
                                 transition={{ duration: 0.2 }}
                             >
                                 {activeTab === "overview" && <DashboardOverview user={user} stats={stats} />}
+                                {activeTab === "holidays" && <Holidays />}
                                 {activeTab === "settings" && <SystemSettings user={user} isAdmin={isAdmin} />}
                                 {activeTab === "users" && <UserManagement />}
                                 {activeTab === "profile" && <Profile user={user} />}

@@ -798,6 +798,121 @@ app.post('/api/schedule/routine', routineUpload.single('file'), (req, res) => {
     }
 });
 
+// --- Holiday Management API ---
+
+// GET Holidays
+app.get('/api/holidays', (req, res) => {
+    const holidaysPath = path.join(__dirname, 'src', 'data', 'holidays.json');
+    try {
+        if (fs.existsSync(holidaysPath)) {
+            const data = fs.readFileSync(holidaysPath, 'utf8');
+            res.json(JSON.parse(data));
+        } else {
+            res.json([]);
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch holidays' });
+    }
+});
+
+// POST Holiday (Add New)
+app.post('/api/holidays', (req, res) => {
+    const holidaysPath = path.join(__dirname, 'src', 'data', 'holidays.json');
+    const { date, title, note } = req.body;
+
+    try {
+        let holidays = [];
+        if (fs.existsSync(holidaysPath)) {
+            holidays = JSON.parse(fs.readFileSync(holidaysPath, 'utf8'));
+        }
+
+        const newHoliday = {
+            id: `hol-${Date.now()}`,
+            date,
+            title,
+            type: 'custom',
+            isCancelled: false,
+            note: note || ""
+        };
+
+        holidays.push(newHoliday);
+        // Sort by date
+        holidays.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        fs.writeFileSync(holidaysPath, JSON.stringify(holidays, null, 4));
+        logAudit('CREATE_HOLIDAY', req.body.username || 'Admin', `Added holiday: ${title} on ${date}`);
+        res.json({ success: true, message: 'Holiday added successfully', holiday: newHoliday });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to add holiday' });
+    }
+});
+
+// PUT Holiday (Update/Toggle Cancel)
+app.put('/api/holidays/:id', (req, res) => {
+    const { id } = req.params;
+    const { isCancelled, note } = req.body; // allow updating cancellation status and note
+    const holidaysPath = path.join(__dirname, 'src', 'data', 'holidays.json');
+
+    try {
+        if (!fs.existsSync(holidaysPath)) {
+            return res.status(404).json({ error: 'Holidays data not found' });
+        }
+
+        let holidays = JSON.parse(fs.readFileSync(holidaysPath, 'utf8'));
+        const index = holidays.findIndex(h => h.id === id);
+
+        if (index === -1) {
+            return res.status(404).json({ error: 'Holiday not found' });
+        }
+
+        if (isCancelled !== undefined) holidays[index].isCancelled = isCancelled;
+        if (note !== undefined) holidays[index].note = note;
+
+        fs.writeFileSync(holidaysPath, JSON.stringify(holidays, null, 4));
+        logAudit('UPDATE_HOLIDAY', req.body.username || 'Admin', `Updated holiday ${id}`);
+        res.json({ success: true, message: 'Holiday updated successfully', holiday: holidays[index] });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update holiday' });
+    }
+});
+
+// DELETE Holiday (Only custom or logic to hide default)
+app.delete('/api/holidays/:id', (req, res) => {
+    const { id } = req.params;
+    const holidaysPath = path.join(__dirname, 'src', 'data', 'holidays.json');
+
+    try {
+        if (!fs.existsSync(holidaysPath)) {
+            return res.status(404).json({ error: 'Holidays data not found' });
+        }
+
+        let holidays = JSON.parse(fs.readFileSync(holidaysPath, 'utf8'));
+        const holidayToDelete = holidays.find(h => h.id === id);
+
+        if (!holidayToDelete) {
+            return res.status(404).json({ error: 'Holiday not found' });
+        }
+
+        // For default holidays, maybe we don't want to delete, just cancel? 
+        // But admin might want to remove mistakes. Let's allow delete.
+
+        const newHolidays = holidays.filter(h => h.id !== id);
+        fs.writeFileSync(holidaysPath, JSON.stringify(newHolidays, null, 4));
+
+        logAudit('DELETE_HOLIDAY', req.body.username || 'Admin', `Deleted holiday ${holidayToDelete.title}`);
+        res.json({ success: true, message: 'Holiday deleted successfully' });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete holiday' });
+    }
+});
+
 // --- Users & Auth API ---
 
 // LOGIN

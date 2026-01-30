@@ -188,7 +188,7 @@
         "day": "Friday",
         "startTime": "08:00",
         "endTime": "10:30",
-        "type": "Class",
+        "type": "Lab",
         "courseId": "CSE-4118",
         "courseName": "Computer Vision and Image Processing Laboratory",
         "instructor": "Md. Mahamudul Hasan",

@@ -1,0 +1,66 @@
+[
+    {
+        "id": "hol-1769778818398",
+        "date": "2026-01-23",
+        "title": "icpc",
+        "type": "custom",
+        "isCancelled": false,
+        "note": ""
+    },
+    {
+        "id": "hol-1769779081262",
+        "date": "2026-01-28",
+        "title": "test",
+        "type": "custom",
+        "isCancelled": false,
+        "note": ""
+    },
+    {
+        "id": "hol-1769778735438",
+        "date": "2026-01-31",
+        "title": "tour",
+        "type": "custom",
+        "isCancelled": false,
+        "note": "ok"
+    },
+    {
+        "id": "hol-1769778199011",
+        "date": "2026-02-02",
+        "title": "Pitha Fastival - 2026",
+        "type": "custom",
+        "isCancelled": false,
+        "note": ""
+    },
+    {
+        "id": "hol-1",
+        "date": "2026-02-21",
+        "title": "International Mother Language Day",
+        "type": "default",
+        "isCancelled": false,
+        "note": ""
+    },
+    {
+        "id": "hol-2",
+        "date": "2026-03-26",
+        "title": "Independence Day",
+        "type": "default",
+        "isCancelled": false,
+        "note": ""
+    },
+    {
+        "id": "hol-3",
+        "date": "2026-04-14",
+        "title": "Pahela Baishakh",
+        "type": "default",
+        "isCancelled": false,
+        "note": ""
+    },
+    {
+        "id": "hol-4",
+        "date": "2026-05-01",
+        "title": "May Day",
+        "type": "default",
+        "isCancelled": false,
+        "note": ""
+    }
+]
