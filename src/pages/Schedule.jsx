@@ -6,6 +6,7 @@ import {
     Plus, Edit, Trash2, X, Save, Settings, Filter, LayoutGrid, List, CalendarDays, Check,
     Eye, Download, Upload
 } from "lucide-react";
+import { logActivity } from "../lib/logger";
 // import routineImg from '../contents/RoutineV1.png'; // Removed static import
 
 // Helper to get week number for "Alter Class" logic
@@ -314,6 +315,14 @@ export default function Schedule() {
         try {
             const { error } = await supabase.from('schedule').delete().eq('id', id);
             if (error) throw error;
+
+            // Log activity
+            await logActivity(
+                "Deleted Class Schedule",
+                `Class schedule '${id}' was deleted by ${user.username || 'Admin'}.`,
+                "warning"
+            );
+
             fetchSchedule();
         } catch (error) {
             console.error("Error deleting event:", error);
@@ -341,6 +350,14 @@ export default function Schedule() {
 
             const { error } = await supabase.from('schedule').upsert(payload);
             if (error) throw error;
+
+            // Log activity
+            await logActivity(
+                formData.id.includes('sched-') ? "Created Class Schedule" : "Updated Class Schedule",
+                `Class for '${formData.courseName}' on ${formData.day} was upserted by ${user.username || 'Admin'}.`,
+                "success"
+            );
+
             setIsModalOpen(false);
             fetchSchedule();
         } catch (error) {
@@ -391,6 +408,14 @@ export default function Schedule() {
             const { error } = await supabase.from('holidays').upsert(payload);
 
             if (error) throw error;
+
+            // Log activity
+            await logActivity(
+                holidayFormData.id ? "Updated Holiday" : "Created Holiday",
+                `Holiday '${holidayFormData.title}' on ${holidayFormData.date} was upserted by ${user.username || 'Admin'}.`,
+                "success"
+            );
+
             fetchHolidays();
             setIsHolidayModalOpen(false);
         } catch (error) {
@@ -403,6 +428,14 @@ export default function Schedule() {
         try {
             const { error } = await supabase.from('holidays').delete().eq('id', id);
             if (error) throw error;
+
+            // Log activity
+            await logActivity(
+                "Deleted Holiday",
+                `Holiday '${id}' was deleted by ${user.username || 'Admin'}.`,
+                "warning"
+            );
+
             fetchHolidays();
             setIsHolidayModalOpen(false);
         } catch (error) {
@@ -444,6 +477,14 @@ export default function Schedule() {
             if (dbError) throw dbError;
 
             setRoutineUrl(`${publicUrl}?t=${Date.now()}`);
+
+            // Log activity
+            await logActivity(
+                "Updated Analog Routine",
+                `Routine image updated by ${user.username || 'Admin'}.`,
+                "info"
+            );
+
             alert("Routine updated successfully!");
 
         } catch (error) {

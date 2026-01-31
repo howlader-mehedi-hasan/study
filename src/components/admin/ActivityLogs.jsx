@@ -25,7 +25,7 @@ const ActivityLogs = () => {
                 user: log.username,
                 action: log.action,
                 details: log.details,
-                type: 'info' // Default type since it wasn't in DB
+                type: log.type || 'info'
             }));
             setAuditLogs(mappedLogs);
         } catch (error) {

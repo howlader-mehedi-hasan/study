@@ -4,6 +4,7 @@ import { Reorder } from "framer-motion";
 import { Folder, Search, BookOpen, Plus, Edit, Trash2, X, Save, Upload, Check, FileText, Loader2, GripVertical, List } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabaseClient";
+import { logActivity } from "../lib/logger";
 
 export default function Courses() {
     const { user, isAdmin, hasPermission } = useAuth();
@@ -115,6 +116,13 @@ export default function Courses() {
                 if (fileDbError) throw fileDbError;
             }
 
+            // Log the activity
+            await logActivity(
+                "Updated Course",
+                `Course '${courseName}' (${courseId}) was created or updated by ${user.username || 'Admin'}.`,
+                "success"
+            );
+
             setMessage({ type: "success", text: "Course saved successfully!" });
             setTimeout(() => {
                 setIsModalOpen(false);
@@ -156,6 +164,13 @@ export default function Courses() {
             const { error } = await supabase.from('courses').delete().eq('id', id);
 
             if (error) throw error;
+
+            // Log the activity
+            await logActivity(
+                "Deleted Course",
+                `Course ID '${id}' was deleted.`,
+                "warning"
+            );
 
             alert("Course deleted successfully!");
             fetchCourses();

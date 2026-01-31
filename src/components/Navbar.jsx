@@ -53,7 +53,7 @@ export default function Navbar() {
                             <GraduationCap className="w-6 h-6" />
                         </div>
                         <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                            HMH-CourseMaterials
+                            Study-HMH
                         </span>
                     </Link>
 

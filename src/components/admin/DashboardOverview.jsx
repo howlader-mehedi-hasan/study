@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Mail, AlertCircle, MessageSquare, ArrowUpRight, Clock, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 
 const DashboardOverview = ({ user, stats }) => {
     const { totalUsers, totalMessages, totalComplaints, totalOpinions } = stats;
+    const [recentLogs, setRecentLogs] = useState([]);
+
+    useEffect(() => {
+        const fetchRecentLogs = async () => {
+            const { data, error } = await supabase
+                .from('audit_logs')
+                .select('*')
+                .order('date', { ascending: false })
+                .limit(5);
+
+            if (data) setRecentLogs(data);
+        };
+        fetchRecentLogs();
+    }, []);
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -111,28 +126,37 @@ const DashboardOverview = ({ user, stats }) => {
                 />
             </div>
 
-            {/* Recent Activity Mockup (Could be connected to real logs later) */}
+            {/* Recent Activity Log - Now Connected to Supabase */}
             <motion.div variants={itemVariants} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700">
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center">
                         <Clock className="w-5 h-5 mr-2 text-gray-400" />
                         Recent System Activity
                     </h2>
-                    <button className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline">View All Logs</button>
+                    <Link to="/admin" onClick={() => window.location.search = '?tab=activity'} className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline">View All Logs</Link>
                 </div>
 
                 <div className="space-y-4">
-                    {[1, 2, 3].map((_, i) => (
-                        <div key={i} className="flex items-start space-x-4 p-4 rounded-xl bg-gray-50 dark:bg-slate-700/30 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-                            <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center shrink-0">
-                                <Shield className="w-4 h-4" />
+                    {recentLogs.length === 0 ? (
+                        <div className="text-center py-4 text-gray-500 text-sm">No recent activity</div>
+                    ) : (
+                        recentLogs.map((log) => (
+                            <div key={log.id} className="flex items-start space-x-4 p-4 rounded-xl bg-gray-50 dark:bg-slate-700/30 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${log.type === 'error' ? 'bg-red-100 text-red-600' :
+                                    log.type === 'warning' ? 'bg-amber-100 text-amber-600' :
+                                        'bg-green-100 dark:bg-green-900/30 text-green-600'
+                                    }`}>
+                                    <Shield className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{log.action}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {new Date(log.date).toLocaleString()} • {log.username}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">System Backup completed successfully</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">2 hours ago • System</p>
-                            </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </motion.div>
         </motion.div>

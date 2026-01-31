@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabaseClient";
+import { logActivity } from "../lib/logger";
 import { Plus, Calendar, Clock, FileText, Download, Trash2, Edit, X, Save, AlertCircle } from "lucide-react";
 
 const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete }) => {
@@ -158,6 +159,14 @@ export default function Notices() {
         try {
             const { error } = await supabase.from('notices').delete().eq('id', id);
             if (error) throw error;
+
+            // Log activity
+            await logActivity(
+                "Deleted Notice",
+                `Notice '${id}' was deleted by ${user.username || 'Admin'}.`,
+                "warning"
+            );
+
             fetchNotices();
         } catch (error) {
             console.error("Error deleting notice:", error);
@@ -238,6 +247,13 @@ export default function Notices() {
                 console.error(error);
                 alert("Failed to save notice");
             } else {
+                // Log activity
+                await logActivity(
+                    editingNotice ? "Updated Notice" : "Created Notice",
+                    `Notice '${formData.title}' was ${editingNotice ? "updated" : "created"} by ${user.username || 'Admin'}.`,
+                    "success"
+                );
+
                 setIsModalOpen(false);
                 fetchNotices();
             }
