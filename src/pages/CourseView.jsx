@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { FileText, ArrowLeft, Download, Eye, HelpCircle, Upload, Check, Loader2, Plus, Trash2, Clock, Calendar, Pencil, BookOpen } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import DocumentViewer from "../components/DocumentViewer";
 
 import { supabase } from "../lib/supabaseClient";
 
@@ -21,7 +20,6 @@ export default function CourseView() {
     const [uploadFiles, setUploadFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [syllabus, setSyllabus] = useState(null);
-    const [viewingFile, setViewingFile] = useState(null);
 
     const [course, setCourse] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -562,16 +560,15 @@ export default function CourseView() {
                                         </div>
                                     </div>
                                     <div className="flex items-center space-x-3">
-                                        <button
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setViewingFile({ url: file.path, type: file.type, name: file.name });
-                                            }}
+                                        <a
+                                            href={`/viewer?url=${encodeURIComponent(file.path)}&type=${encodeURIComponent(file.type)}&name=${encodeURIComponent(file.name)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
                                             className="flex items-center space-x-2 px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 hover:border-gray-300 transition-all shadow-sm text-sm font-medium"
                                         >
                                             <Eye className="w-4 h-4" />
                                             <span className="hidden sm:inline">Open</span>
-                                        </button>
+                                        </a>
                                         <a
                                             href={file.path}
                                             download
@@ -596,14 +593,6 @@ export default function CourseView() {
                     </div>
                 )}
             </div>
-
-            <DocumentViewer
-                isOpen={!!viewingFile}
-                onClose={() => setViewingFile(null)}
-                fileUrl={viewingFile?.url}
-                fileType={viewingFile?.type}
-                fileName={viewingFile?.name}
-            />
         </div>
     );
 }
