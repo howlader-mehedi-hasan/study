@@ -23,8 +23,8 @@ const getWeekNumber = (d) => {
 const DAYS = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const EVENT_TYPES = ["Class", "Lab", "Break", "Tiffin", "Prayer", "Exam"];
 
-// Time Slots Configuration
-const TIME_SLOTS = [
+// Default Time Slots Configuration
+const DEFAULT_TIME_SLOTS = [
     { label: "08:00-09:15", start: "08:00", end: "09:15" },
     { label: "09:15-10:30", start: "09:15", end: "10:30" },
     { label: "10:45-12:00", start: "10:45", end: "12:00" },
@@ -35,7 +35,7 @@ const TIME_SLOTS = [
     { label: "05:45-07:00", start: "17:45", end: "19:00" }
 ];
 
-const FRIDAY_SLOTS = [
+const DEFAULT_FRIDAY_SLOTS = [
     { label: "08:00-09:15", start: "08:00", end: "09:15" },
     { label: "09:15-10:30", start: "09:15", end: "10:30" },
     { label: "10:30-11:45", start: "10:30", end: "11:45" },
@@ -45,6 +45,7 @@ const FRIDAY_SLOTS = [
     { label: "04:30-05:45", start: "16:30", end: "17:45" },
     { label: "05:45-07:00", start: "17:45", end: "19:00" }
 ];
+
 
 export default function Schedule() {
     const { user, isAdmin, hasPermission } = useAuth();
@@ -60,6 +61,10 @@ export default function Schedule() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [routineUrl, setRoutineUrl] = useState("/routine.png");
     const [uploadingRoutine, setUploadingRoutine] = useState(false);
+    const [timeSlots, setTimeSlots] = useState(DEFAULT_TIME_SLOTS);
+    const [fridaySlots, setFridaySlots] = useState(DEFAULT_FRIDAY_SLOTS);
+    const [editingTimeSlots, setEditingTimeSlots] = useState([]);
+    const [editingFridaySlots, setEditingFridaySlots] = useState([]);
 
     // Fetch Routine from Supabase
     useEffect(() => {
@@ -174,6 +179,12 @@ export default function Schedule() {
                 if (data.default_schedule_view) {
                     setIsPrecisionMode(data.default_schedule_view === 'precision');
                 }
+                if (data.time_slots) {
+                    setTimeSlots(data.time_slots);
+                }
+                if (data.friday_slots) {
+                    setFridaySlots(data.friday_slots);
+                }
             }
         } catch (error) {
             console.error("Failed to fetch settings:", error);
@@ -246,17 +257,61 @@ export default function Schedule() {
         return () => clearInterval(interval);
     }, [schedule, holidays]);
 
-    const saveSettings = async (newVisibleDays) => {
+    const saveSettings = async (newVisibleDays, newTimeSlots = timeSlots, newFridaySlots = fridaySlots) => {
         try {
             const { error } = await supabase.from('settings').upsert({
                 id: 1, // Singleton
-                visible_days: newVisibleDays
+                visible_days: newVisibleDays,
+                time_slots: newTimeSlots,
+                friday_slots: newFridaySlots
             });
             if (error) throw error;
             setVisibleDays(newVisibleDays);
+            setTimeSlots(newTimeSlots);
+            setFridaySlots(newFridaySlots);
         } catch (error) {
             console.error("Failed to save settings:", error);
         }
+    };
+
+    const handleBackupSlots = () => {
+        const data = {
+            timeSlots: editingTimeSlots,
+            fridaySlots: editingFridaySlots
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `schedule-slots-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleRestoreSlots = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                if (data.timeSlots && data.fridaySlots) {
+                    setEditingTimeSlots(data.timeSlots);
+                    setEditingFridaySlots(data.fridaySlots);
+                    alert("Slots restored successfully! Click 'Save Settings' to apply.");
+                } else {
+                    alert("Invalid backup file format.");
+                }
+            } catch (error) {
+                console.error("Error parsing backup file:", error);
+                alert("Error reading backup file.");
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = null; // Reset input
     };
 
     // Navigation Logic
@@ -753,7 +808,11 @@ export default function Schedule() {
                 {hasPermission('schedule_edit') && (
                     <div className="flex items-center space-x-2">
                         <button
-                            onClick={() => setIsSettingsOpen(true)}
+                            onClick={() => {
+                                setEditingTimeSlots([...timeSlots]);
+                                setEditingFridaySlots([...fridaySlots]);
+                                setIsSettingsOpen(true);
+                            }}
                             className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-slate-700 rounded-lg transition-colors"
                             title="Schedule Settings"
                         >
@@ -896,7 +955,7 @@ export default function Schedule() {
                             <div className="min-w-[800px] border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden">
                                 <div className="bg-gray-100 dark:bg-slate-800 border-b border-gray-300 dark:border-slate-600 flex">
                                     <div className="w-24 p-3 font-bold text-center border-r border-gray-300 dark:border-slate-600 flex items-center justify-center bg-gray-200 dark:bg-slate-700 mr-2 rounded-r-md">Time</div>
-                                    {TIME_SLOTS.map((slot, i) => (
+                                    {timeSlots.map((slot, i) => (
                                         <div key={i} className={`flex-1 p-2 text-center font-bold text-sm border-r border-gray-300 dark:border-slate-600 last:border-r-0 flex items-center justify-center bg-gray-200 dark:bg-slate-700 ${(i === 1 || i === 3) ? 'mr-2 rounded-r-md' : ''}`}>
                                             {slot.label}
                                         </div>
@@ -924,16 +983,16 @@ export default function Schedule() {
                                                             {dayDate.getDate()}/{dayDate.getMonth() + 1}
                                                         </span>
                                                     </div>
-                                                    {TIME_SLOTS.map((slot, i) => {
+                                                    {timeSlots.map((slot, i) => {
                                                         const eventsStartingHere = dayEvents.filter(ev => {
-                                                            const { startIndex } = calculateEventSpan(ev, TIME_SLOTS);
+                                                            const { startIndex } = calculateEventSpan(ev, timeSlots);
                                                             return startIndex === i;
                                                         });
 
                                                         return (
                                                             <div key={i} className={`flex-1 p-1 border-r border-gray-300 dark:border-slate-600 last:border-r-0 min-h-[100px] relative hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${(i === 1 || i === 3) ? 'mr-2 rounded-r-md' : ''}`}>
                                                                 {eventsStartingHere.map(ev => {
-                                                                    const { span } = calculateEventSpan(ev, TIME_SLOTS);
+                                                                    const { span } = calculateEventSpan(ev, timeSlots);
                                                                     const widthStyle = span > 1 ? `calc(${span * 100}% + ${span - 1}px)` : '100%';
 
                                                                     return (
@@ -957,7 +1016,7 @@ export default function Schedule() {
                                 <div className="min-w-[800px] border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden mt-8">
                                     <div className="bg-gray-100 dark:bg-slate-800 border-b border-gray-300 dark:border-slate-600 flex">
                                         <div className="w-24 p-3 font-bold text-center border-r border-gray-300 dark:border-slate-600 flex items-center justify-center bg-gray-200 dark:bg-slate-700 mr-2 rounded-r-md">Time</div>
-                                        {FRIDAY_SLOTS.map((slot, i) => (
+                                        {fridaySlots.map((slot, i) => (
                                             <div key={i} className="flex-1 p-2 text-center font-bold text-sm border-r border-gray-300 dark:border-slate-600 last:border-r-0 flex items-center justify-center bg-gray-200 dark:bg-slate-700">
                                                 {slot.label}
                                             </div>
@@ -984,16 +1043,16 @@ export default function Schedule() {
                                                                 {dayDate.getDate()}/{dayDate.getMonth() + 1}
                                                             </span>
                                                         </div>
-                                                        {FRIDAY_SLOTS.map((slot, i) => {
+                                                        {fridaySlots.map((slot, i) => {
                                                             const eventsStartingHere = dayEvents.filter(ev => {
-                                                                const { startIndex } = calculateEventSpan(ev, FRIDAY_SLOTS);
+                                                                const { startIndex } = calculateEventSpan(ev, fridaySlots);
                                                                 return startIndex === i;
                                                             });
 
                                                             return (
                                                                 <div key={i} className="flex-1 p-1 border-r border-gray-300 dark:border-slate-600 last:border-r-0 min-h-[100px] relative hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                                                                     {eventsStartingHere.map(ev => {
-                                                                        const { span } = calculateEventSpan(ev, FRIDAY_SLOTS);
+                                                                        const { span } = calculateEventSpan(ev, fridaySlots);
                                                                         const widthStyle = span > 1 ? `calc(${span * 100}% + ${span - 1}px)` : '100%';
                                                                         return (
                                                                             <div key={ev.id} style={{ width: widthStyle, position: 'relative', zIndex: span > 1 ? 10 : 1 }} className="h-full">
@@ -1153,23 +1212,21 @@ export default function Schedule() {
                                     <X className="w-6 h-6" />
                                 </button>
                             </div>
-                            <div className="p-6">
+                            <div className="p-6 overflow-y-auto max-h-[70vh]">
                                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Visible Days (Work Week)</h3>
-                                <div className="space-y-2">
+                                <div className="flex flex-wrap gap-2 mb-6">
                                     {DAYS.map(day => (
-                                        <label key={day} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg cursor-pointer transition-colors">
-                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${visibleDays.includes(day) ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 dark:border-slate-600'}`}>
-                                                {visibleDays.includes(day) && <Check className="w-3.5 h-3.5" />}
-                                            </div>
+                                        <label key={day} className="flex items-center space-x-2 p-2 bg-gray-50 border border-gray-200 dark:bg-slate-700/50 dark:border-slate-600 rounded-lg cursor-pointer transition-colors">
                                             <input
                                                 type="checkbox"
-                                                className="hidden"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                 checked={visibleDays.includes(day)}
                                                 onChange={() => {
                                                     const newDays = visibleDays.includes(day)
                                                         ? visibleDays.filter(d => d !== day)
                                                         : [...visibleDays, day].sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
-                                                    saveSettings(newDays);
+                                                    // Immediately update the main state, but don't save to DB yet to align with new modal save logic
+                                                    setVisibleDays(newDays);
                                                 }}
                                             />
                                             <span className={`text-sm ${visibleDays.includes(day) ? 'font-medium text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -1178,9 +1235,138 @@ export default function Schedule() {
                                         </label>
                                     ))}
                                 </div>
-                                <p className="text-xs text-gray-400 mt-4 px-1">
-                                    Changes are saved automatically and affect all users.
-                                </p>
+
+                                <div className="mb-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Regular Time Slots</h3>
+                                        <button
+                                            onClick={() => setEditingTimeSlots([...editingTimeSlots, { label: "New Slot", start: "00:00", end: "00:00" }])}
+                                            className="text-xs flex items-center text-blue-600 hover:text-blue-700 font-medium"
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" /> Add Slot
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {editingTimeSlots.map((slot, idx) => (
+                                            <div key={idx} className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={slot.label}
+                                                    onChange={e => {
+                                                        const newSlots = [...editingTimeSlots];
+                                                        newSlots[idx].label = e.target.value;
+                                                        setEditingTimeSlots(newSlots);
+                                                    }}
+                                                    placeholder="Label (e.g. 08:00-09:15)"
+                                                    className="flex-1 px-2 py-1.5 text-sm rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 min-w-[120px]"
+                                                />
+                                                <input
+                                                    type="time"
+                                                    value={slot.start}
+                                                    onChange={e => {
+                                                        const newSlots = [...editingTimeSlots];
+                                                        newSlots[idx].start = e.target.value;
+                                                        setEditingTimeSlots(newSlots);
+                                                    }}
+                                                    className="w-24 px-2 py-1.5 text-sm rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700"
+                                                />
+                                                <span className="text-gray-500">-</span>
+                                                <input
+                                                    type="time"
+                                                    value={slot.end}
+                                                    onChange={e => {
+                                                        const newSlots = [...editingTimeSlots];
+                                                        newSlots[idx].end = e.target.value;
+                                                        setEditingTimeSlots(newSlots);
+                                                    }}
+                                                    className="w-24 px-2 py-1.5 text-sm rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700"
+                                                />
+                                                <button onClick={() => setEditingTimeSlots(editingTimeSlots.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-50 rounded">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="mb-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Friday Time Slots</h3>
+                                        <button
+                                            onClick={() => setEditingFridaySlots([...editingFridaySlots, { label: "New Slot", start: "00:00", end: "00:00" }])}
+                                            className="text-xs flex items-center text-blue-600 hover:text-blue-700 font-medium"
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" /> Add Slot
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {editingFridaySlots.map((slot, idx) => (
+                                            <div key={idx} className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={slot.label}
+                                                    onChange={e => {
+                                                        const newSlots = [...editingFridaySlots];
+                                                        newSlots[idx].label = e.target.value;
+                                                        setEditingFridaySlots(newSlots);
+                                                    }}
+                                                    placeholder="Label"
+                                                    className="flex-1 px-2 py-1.5 text-sm rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 min-w-[120px]"
+                                                />
+                                                <input
+                                                    type="time"
+                                                    value={slot.start}
+                                                    onChange={e => {
+                                                        const newSlots = [...editingFridaySlots];
+                                                        newSlots[idx].start = e.target.value;
+                                                        setEditingFridaySlots(newSlots);
+                                                    }}
+                                                    className="w-24 px-2 py-1.5 text-sm rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700"
+                                                />
+                                                <span className="text-gray-500">-</span>
+                                                <input
+                                                    type="time"
+                                                    value={slot.end}
+                                                    onChange={e => {
+                                                        const newSlots = [...editingFridaySlots];
+                                                        newSlots[idx].end = e.target.value;
+                                                        setEditingFridaySlots(newSlots);
+                                                    }}
+                                                    className="w-24 px-2 py-1.5 text-sm rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700"
+                                                />
+                                                <button onClick={() => setEditingFridaySlots(editingFridaySlots.filter((_, i) => i !== idx))} className="p-1.5 text-red-500 hover:bg-red-50 rounded">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-6 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 flex flex-col md:flex-row justify-between gap-4">
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={handleBackupSlots}
+                                        className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center transition-colors shadow-sm text-sm font-medium"
+                                    >
+                                        <Download className="w-4 h-4 mr-2" /> Backup Slots
+                                    </button>
+                                    <label className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center cursor-pointer transition-colors shadow-sm text-sm font-medium">
+                                        <Upload className="w-4 h-4 mr-2" /> Restore Slots
+                                        <input type="file" accept=".json" className="hidden" onChange={handleRestoreSlots} />
+                                    </label>
+                                </div>
+                                <div className="flex justify-end gap-3 text-sm">
+                                    <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg font-medium transition-colors">Cancel</button>
+                                    <button
+                                        onClick={() => {
+                                            saveSettings(visibleDays, editingTimeSlots, editingFridaySlots);
+                                            setIsSettingsOpen(false);
+                                        }}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-lg shadow-blue-600/20 transition-colors font-medium"
+                                    >
+                                        <Save className="w-4 h-4 mr-2" /> Save Settings
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
