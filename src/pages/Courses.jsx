@@ -94,7 +94,12 @@ export default function Courses() {
                     if (uploadError) throw uploadError;
 
                     const ext = fileName.split('.').pop().toLowerCase();
-                    const type = ['jpg', 'jpeg', 'png', 'gif'].includes(ext) ? 'image' : 'pdf';
+                    let type = 'pdf'; // default fallback text icon
+                    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+                        type = 'image';
+                    } else if (['ppt', 'pptx'].includes(ext)) {
+                        type = 'ppt';
+                    }
 
                     // Get Public URL
                     const { data: { publicUrl } } = supabase.storage.from('materials').getPublicUrl(filePath);
@@ -466,7 +471,7 @@ export default function Courses() {
                                                     multiple
                                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                     onChange={(e) => setFiles(e.target.files)}
-                                                    accept="application/pdf,image/*"
+                                                    accept="application/pdf,image/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                                 />
                                                 <div className="flex flex-col items-center">
                                                     {files.length > 0 ? (

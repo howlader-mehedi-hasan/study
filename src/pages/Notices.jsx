@@ -402,12 +402,12 @@ export default function Notices() {
                                             <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
                                                 <span className="font-semibold">{file ? file.name : "Click to upload"}</span>
                                             </p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">PDF or Image (MAX. 5MB)</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">PDF, PPT, or Image (MAX. 5MB)</p>
                                         </div>
                                         <input
                                             type="file"
                                             className="hidden"
-                                            accept="application/pdf,image/*"
+                                            accept="application/pdf,image/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                             onChange={(e) => e.target.files && setFile(e.target.files[0])}
                                         />
                                     </label>

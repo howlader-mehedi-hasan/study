@@ -205,7 +205,12 @@ export default function CourseView() {
                 const { data: { publicUrl } } = supabase.storage.from('materials').getPublicUrl(fileName);
 
                 const ext = file.name.split('.').pop().toLowerCase();
-                const type = ['jpg', 'jpeg', 'png'].includes(ext) ? 'image' : 'pdf';
+                let type = 'pdf'; // Default
+                if (['jpg', 'jpeg', 'png'].includes(ext)) {
+                    type = 'image';
+                } else if (['ppt', 'pptx'].includes(ext)) {
+                    type = 'ppt';
+                }
 
                 uploadedFiles.push({
                     course_id: courseId,
@@ -485,7 +490,7 @@ export default function CourseView() {
                                     multiple
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     onChange={(e) => setUploadFiles(e.target.files)}
-                                    accept="application/pdf,image/*"
+                                    accept="application/pdf,image/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                 />
                                 {uploadFiles.length > 0 ? (
                                     <div className="flex items-center text-green-600 dark:text-green-400">
