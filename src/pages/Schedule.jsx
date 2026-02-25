@@ -122,6 +122,7 @@ export default function Schedule() {
         try {
             const { data, error } = await supabase.from('holidays').select('*');
             if (error) throw error;
+            if (!data) return;
             // Map snake_case to camelCase
             const mapped = data.map(h => ({
                 ...h,
@@ -134,32 +135,6 @@ export default function Schedule() {
         }
     };
 
-    const fetchSchedule = async () => {
-        try {
-            const { data, error } = await supabase.from('schedule').select('*');
-            if (error) throw error;
-            // Map snake_case to camelCase
-            const mapped = data.map(s => ({
-                id: s.id,
-                day: s.day,
-                startTime: s.start_time,
-                endTime: s.end_time,
-                type: s.type,
-                courseId: s.course_id,
-                courseName: s.course_name,
-                instructor: s.instructor,
-                room: s.room,
-                recurrence: s.recurrence,
-                color: s.color,
-                username: s.username,
-                isCancelled: s.is_cancelled
-            }));
-            setSchedule(mapped);
-        } catch (error) {
-            console.error("Failed to fetch schedule:", error);
-        }
-    };
-
     const fetchCourses = async () => {
         try {
             const { data, error } = await supabase.from('courses').select('id, name, instructor');
@@ -167,6 +142,33 @@ export default function Schedule() {
             setCourses(data || []);
         } catch (error) {
             console.error("Failed to fetch courses:", error);
+        }
+    };
+
+    const fetchSchedule = async () => {
+        try {
+            const { data, error } = await supabase.from('schedule').select('*');
+            if (error) throw error;
+            if (!data) return;
+            // Map snake_case to camelCase
+            const formattedData = data.map(item => ({
+                id: item.id,
+                day: item.day,
+                startTime: item.start_time,
+                endTime: item.end_time,
+                type: item.type,
+                courseId: item.course_id,
+                courseName: item.course_name,
+                instructor: item.instructor,
+                room: item.room,
+                recurrence: item.recurrence,
+                color: item.color,
+                isCancelled: item.is_cancelled || false,
+                note: item.note || ""
+            }));
+            setSchedule(formattedData);
+        } catch (error) {
+            console.error("Failed to fetch schedule:", error);
         }
     };
 
@@ -217,8 +219,10 @@ export default function Schedule() {
             const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
             const currentTimeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
-            // Get today's events sorted by time
-            const todaysEvents = schedule.filter(e => e.day === dayName).sort((a, b) => a.startTime.localeCompare(b.startTime));
+            // Get today's events sorted by time, safely checking for defined startTime
+            const todaysEvents = schedule
+                .filter(e => e.day === dayName && e.startTime)
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
             // Find current or next
             let upcoming = todaysEvents.find(e => e.startTime > currentTimeStr);

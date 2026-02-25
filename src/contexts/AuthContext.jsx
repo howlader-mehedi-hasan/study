@@ -28,7 +28,8 @@ export const AuthProvider = ({ children }) => {
                 .select('*')
                 .eq('username', username)
                 .eq('password', password)
-                .single();
+                .limit(1)
+                .maybeSingle();
 
             if (error || !data) {
                 return { success: false, error: "Invalid username or password" };

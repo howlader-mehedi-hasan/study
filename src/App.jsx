@@ -18,7 +18,6 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Complaints from "./pages/Complaints";
 import Opinions from "./pages/Opinions";
-import DocumentViewer from "./pages/DocumentViewer";
 
 function App() {
   return (
@@ -50,7 +49,6 @@ function App() {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/complaints" element={<Complaints />} />
                 <Route path="/opinions" element={<Opinions />} />
-                <Route path="/viewer" element={<DocumentViewer />} />
               </Routes>
             </div>
             <Footer />

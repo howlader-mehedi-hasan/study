@@ -3,8 +3,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 import { logActivity } from "../lib/logger";
 import { Plus, Calendar, Clock, FileText, Download, Trash2, Edit, X, Save, AlertCircle, Eye } from "lucide-react";
+import DocumentViewer from "../components/DocumentViewer";
 
-const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete }) => {
+const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete, onView }) => {
     const isExpired = new Date(notice.validUntil) < new Date();
 
     return (
@@ -59,15 +60,22 @@ const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete }) => {
 
             <div className="pt-4 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center">
                 {notice.pdfPath ? (
-                    <a
-                        href={`/viewer?url=${encodeURIComponent(notice.pdfPath)}&type=${encodeURIComponent(['jpg', 'jpeg', 'png', 'gif'].includes(notice.pdfPath.split('.').pop().toLowerCase()) ? 'image' : ['ppt', 'pptx'].includes(notice.pdfPath.split('.').pop().toLowerCase()) ? 'ppt' : 'pdf')}&name=${encodeURIComponent(notice.title)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            // Guess type from URL string if needed, or pass 'pdf'/'image'
+                            const ext = notice.pdfPath.split('.').pop().toLowerCase();
+                            let type = 'pdf';
+                            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) type = 'image';
+                            if (['ppt', 'pptx'].includes(ext)) type = 'ppt';
+
+                            onView({ url: notice.pdfPath, type: type, name: notice.title });
+                        }}
                         className="inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-3 py-1.5 rounded-lg transition-colors"
                     >
                         <Eye className="w-4 h-4 mr-2" />
                         View Attachment
-                    </a>
+                    </button>
                 ) : (
                     <span className="text-sm text-gray-400 italic px-3 py-1.5">No attachment</span>
                 )}
@@ -92,6 +100,7 @@ export default function Notices() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingNotice, setEditingNotice] = useState(null);
     const [file, setFile] = useState(null);
+    const [viewingFile, setViewingFile] = useState(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -292,6 +301,7 @@ export default function Notices() {
                             hasPermission={hasPermission}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
+                            onView={setViewingFile}
                         />
                     ))
                 ) : (
@@ -441,8 +451,13 @@ export default function Notices() {
                 )
             }
 
-            )
-            }
+            <DocumentViewer
+                isOpen={!!viewingFile}
+                onClose={() => setViewingFile(null)}
+                fileUrl={viewingFile?.url}
+                fileType={viewingFile?.type}
+                fileName={viewingFile?.name}
+            />
         </div >
     );
 }
