@@ -318,6 +318,103 @@ export default function Schedule() {
         e.target.value = null; // Reset input
     };
 
+    const handleBackupRoutine = async () => {
+        try {
+            const { data, error } = await supabase.from('schedule').select('*');
+            if (error) throw error;
+            
+            if (!data || data.length === 0) {
+                alert("No schedule data found to backup.");
+                return;
+            }
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `full-routine-backup-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            await logActivity(
+                "Exported Routine Backup",
+                `Full routine schedule was downloaded as backup by ${user.username || 'Admin'}.`,
+                "info"
+            );
+        } catch (error) {
+            console.error("Error creating backup:", error);
+            alert("Failed to create backup.");
+        }
+    };
+
+    const handleRestoreRoutine = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!window.confirm("WARNING: Restoring will completely replace the current schedule with the backup data. Are you sure you want to proceed?")) {
+            e.target.value = null;
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                
+                if (!Array.isArray(data)) {
+                    alert("Invalid backup file format. Expected an array of schedule events.");
+                    return;
+                }
+
+                // 1. Delete all existing schedule items to cleanly replace
+                const { error: deleteError } = await supabase
+                    .from('schedule')
+                    .delete()
+                    .neq('id', 'dummy-always-true-condition-if-empty'); // delete all logic
+
+                // the best way to delete all rows is `.neq('id', '0')` or similar if UUID
+                const { error: fullDeleteError } = await supabase
+                   .from('schedule')
+                   .delete()
+                   .gt('created_at', '2000-01-01'); // simple hack to delete all if you don't want to specify column types
+
+                // Instead of conditional delete, we'll try standard truncate/delete route or just upsert all 
+                // However, upserting all might leave old records if they were deleted on live but are in the backup.
+                // Let's do a reliable delete-all first, assuming 'id' is a string:
+                const { data: allIds } = await supabase.from('schedule').select('id');
+                if (allIds && allIds.length > 0) {
+                    const idsToDelete = allIds.map(r => r.id);
+                    await supabase.from('schedule').delete().in('id', idsToDelete);
+                }
+
+                // 2. Insert the restored data
+                // Need to remove any local frontend fields that shouldn't be pushed back if they exist in raw table format
+                // The backup from export is direct from DB, so structure should be exact.
+                const { error: insertError } = await supabase.from('schedule').insert(data);
+                
+                if (insertError) throw insertError;
+
+                await logActivity(
+                    "Restored Routine Backup",
+                    `Full routine schedule was restored from backup by ${user.username || 'Admin'}.`,
+                    "warning"
+                );
+
+                alert("Routine restored successfully!");
+                fetchSchedule(); // Refresh UI
+                setIsSettingsOpen(false); // Close modal
+                
+            } catch (error) {
+                console.error("Error parsing or restoring backup file:", error);
+                alert("Error reading/restoring backup file. " + (error.message || ""));
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = null; // Reset input
+    };
+
     // Navigation Logic
     const nextPeriod = () => {
         const newDate = new Date(currentDate);
@@ -1347,19 +1444,37 @@ export default function Schedule() {
                                 </div>
                             </div>
                             <div className="p-6 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 flex flex-col md:flex-row justify-between gap-4">
-                                <div className="flex gap-3">
-                                    <button
-                                        onClick={handleBackupSlots}
-                                        className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center transition-colors shadow-sm text-sm font-medium"
-                                    >
-                                        <Download className="w-4 h-4 mr-2" /> Backup Slots
-                                    </button>
-                                    <label className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center cursor-pointer transition-colors shadow-sm text-sm font-medium">
-                                        <Upload className="w-4 h-4 mr-2" /> Restore Slots
-                                        <input type="file" accept=".json" className="hidden" onChange={handleRestoreSlots} />
-                                    </label>
+                                <div className="flex flex-col gap-3">
+                                    <div className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Slots</div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={handleBackupSlots}
+                                            className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center transition-colors shadow-sm text-sm font-medium"
+                                        >
+                                            <Download className="w-4 h-4 mr-2" /> Backup Slots
+                                        </button>
+                                        <label className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center cursor-pointer transition-colors shadow-sm text-sm font-medium">
+                                            <Upload className="w-4 h-4 mr-2" /> Restore Slots
+                                            <input type="file" accept=".json" className="hidden" onChange={handleRestoreSlots} />
+                                        </label>
+                                    </div>
+                                    
+                                    <div className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mt-2">Full Routine (Classes)</div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={handleBackupRoutine}
+                                            type="button"
+                                            className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center transition-colors shadow-sm text-sm font-medium"
+                                        >
+                                            <Download className="w-4 h-4 mr-2" /> Backup Routine
+                                        </button>
+                                        <label className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center cursor-pointer transition-colors shadow-sm text-sm font-medium">
+                                            <Upload className="w-4 h-4 mr-2" /> Restore Routine
+                                            <input type="file" accept=".json" className="hidden" onChange={handleRestoreRoutine} />
+                                        </label>
+                                    </div>
                                 </div>
-                                <div className="flex justify-end gap-3 text-sm">
+                                <div className="flex items-end justify-end gap-3 text-sm mt-4 md:mt-0">
                                     <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg font-medium transition-colors">Cancel</button>
                                     <button
                                         onClick={() => {
