@@ -9,6 +9,7 @@ import NewsTicker from "../components/NewsTicker";
 export default function Home() {
     const { isAdmin, hasPermission } = useAuth();
     const today = new Date();
+    const [currentTime, setCurrentTime] = useState(new Date());
     const [welcomeMessage, setWelcomeMessage] = useState("Welcome to ClassMaterials Dashboard");
     const [isEditingMessage, setIsEditingMessage] = useState(false);
     const [tempMessage, setTempMessage] = useState("");
@@ -79,6 +80,29 @@ export default function Home() {
 
         fetchData();
     }, []);
+
+    // Timer for Countdown
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    // Helper to calculate remaining time
+    const getRemainingTime = (examDate) => {
+        const diff = examDate - currentTime;
+        if (diff <= 0) return "Started/Finished";
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const minutes = Math.floor((diff / 1000 / 60) % 60);
+        const seconds = Math.floor((diff / 1000) % 60);
+
+        if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+        if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+        return `${minutes}m ${seconds}s`;
+    };
 
     const handleSaveMessage = async () => {
         const newSettings = { ...settings, welcome_message: tempMessage };
@@ -265,6 +289,12 @@ export default function Home() {
                                             <Calendar className="w-3.5 h-3.5 mr-1" />
                                             {exam.examDate.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })} at {exam.time}
                                         </p>
+
+                                        <div className="bg-white/10 text-white text-xs font-mono py-1 px-2 rounded inline-flex items-center mb-3 border border-white/20">
+                                            <Clock className="w-3.5 h-3.5 mr-1 text-orange-300" />
+                                            <span className="text-orange-100">Starts in: </span>
+                                            <span className="font-bold ml-1">{getRemainingTime(exam.examDate)}</span>
+                                        </div>
 
                                         <div className="bg-white/5 rounded-lg p-2 mb-2">
                                             <h4 className="text-xs font-semibold text-blue-200 mb-1 flex items-center">
