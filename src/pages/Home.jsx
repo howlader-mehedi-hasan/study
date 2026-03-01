@@ -17,7 +17,7 @@ export default function Home() {
     const [coursesCount, setCoursesCount] = useState(0);
     const [totalFiles, setTotalFiles] = useState(0);
     const [recentNotices, setRecentNotices] = useState([]);
-    const [nextExam, setNextExam] = useState(null);
+    const [upcomingExams, setUpcomingExams] = useState([]);
 
     // Fetch All Data
     useEffect(() => {
@@ -57,19 +57,19 @@ export default function Home() {
                     .select('*, courses(name)')
                     .gte('date', todayStr)
                     .order('date', { ascending: true })
-                    .limit(1);
+                    .limit(3);
 
                 if (examsData && examsData.length > 0) {
-                    const exam = examsData[0];
-                    const examDate = new Date(`${exam.date}T${exam.time}`);
-                    setNextExam({
+                    const mappedExams = examsData.map(exam => ({
                         ...exam,
-                        examDate,
+                        examDate: new Date(`${exam.date}T${exam.time}`),
                         courseName: exam.courses?.name,
-                        courseId: exam.course_id
-                    });
+                        courseId: exam.course_id,
+                        syllabus: exam.syllabus || 'No syllabus available.'
+                    }));
+                    setUpcomingExams(mappedExams);
                 } else {
-                    setNextExam(null);
+                    setUpcomingExams([]);
                 }
 
             } catch (err) {
@@ -177,12 +177,15 @@ export default function Home() {
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column: Today's Routine */}
+                <div className="order-1 lg:order-1 space-y-8">
+                    <DailyRoutine />
+                </div>
 
-                {/* Left Column: Quick Actions & Notices */}
-                <div className="contents lg:block lg:col-span-2 space-y-8">
-
+                {/* Middle Column: Quick Actions & Notices */}
+                <div className="order-3 lg:order-2 space-y-8">
                     {/* Quick Links Grid */}
-                    <div className="order-4 lg:order-none grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <Link to="/courses" className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all group text-center">
                             <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
                                 <BookOpen className="w-6 h-6" />
@@ -210,7 +213,7 @@ export default function Home() {
                     </div>
 
                     {/* Recent Notices */}
-                    <div className="order-3 lg:order-none bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
                                 <Activity className="w-5 h-5 mr-2 text-orange-500" />
@@ -234,33 +237,50 @@ export default function Home() {
                     </div>
                 </div>
 
-                <div className="contents lg:block space-y-8">
+                {/* Right Column: Next Exam */}
+                <div className="order-2 lg:order-3 space-y-8">
                     {/* Next Exam Card */}
-                    <div className="order-2 lg:order-none bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
 
                         <h2 className="text-lg font-semibold mb-4 flex items-center relative z-10">
                             <Clock className="w-5 h-5 mr-2" />
-                            Up Next
+                            Up Next: Exam Schedule
                         </h2>
 
-                        {nextExam ? (
-                            <div className="relative z-10">
-                                <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 mb-4 border border-white/10">
-                                    <span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded uppercase tracking-wide mb-2 inline-block">
-                                        {nextExam.courseName}
-                                    </span>
-                                    <h3 className="text-2xl font-bold mb-1">{nextExam.title}</h3>
-                                    <p className="text-blue-100 text-sm mb-3">
-                                        {nextExam.examDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                                        <br />
-                                        at {nextExam.time}
-                                    </p>
-                                    <Link to={`/course/${nextExam.courseId}`} className="inline-flex items-center text-sm font-semibold hover:text-blue-200 transition-colors">
-                                        View Syllabus <ArrowRight className="w-4 h-4 ml-1" />
-                                    </Link>
-                                </div>
-                                <div className="text-center">
+                        {upcomingExams.length > 0 ? (
+                            <div className="relative z-10 space-y-3">
+                                {upcomingExams.map((exam, idx) => (
+                                    <div key={exam.id || idx} className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-xs font-bold bg-white/20 px-2 py-0.5 rounded uppercase tracking-wide inline-block">
+                                                {exam.courseName}
+                                            </span>
+                                            <span className="text-xs font-semibold text-blue-100 bg-white/10 px-2 py-0.5 rounded">
+                                                {exam.examDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                            </span>
+                                        </div>
+                                        <h3 className="text-xl font-bold mb-1">{exam.title}</h3>
+                                        <p className="text-blue-100 text-sm mb-2 flex items-center">
+                                            <Calendar className="w-3.5 h-3.5 mr-1" />
+                                            {exam.examDate.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' })} at {exam.time}
+                                        </p>
+
+                                        <div className="bg-white/5 rounded-lg p-2 mb-2">
+                                            <h4 className="text-xs font-semibold text-blue-200 mb-1 flex items-center">
+                                                <BookOpen className="w-3.5 h-3.5 mr-1" /> Syllabus
+                                            </h4>
+                                            <p className="text-sm text-blue-50 line-clamp-2">
+                                                {exam.syllabus}
+                                            </p>
+                                        </div>
+
+                                        <Link to={`/course/${exam.courseId}`} className="inline-flex items-center text-xs font-semibold hover:text-blue-200 transition-colors">
+                                            View Details <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                                        </Link>
+                                    </div>
+                                ))}
+                                <div className="text-center mt-3">
                                     <p className="text-xs text-blue-200 opacity-80">Make sure to prepare well!</p>
                                 </div>
                             </div>
@@ -273,11 +293,6 @@ export default function Home() {
                                 <p className="text-xs opacity-75 mt-1">Enjoy your free time!</p>
                             </div>
                         )}
-                    </div>
-
-                    {/* Today's Routine Widget */}
-                    <div className="order-1 lg:order-none">
-                        <DailyRoutine />
                     </div>
                 </div>
             </div>
