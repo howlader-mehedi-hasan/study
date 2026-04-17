@@ -5,7 +5,7 @@ import { logActivity } from "../lib/logger";
 import { Plus, Calendar, Clock, FileText, Download, Trash2, Edit, X, Save, AlertCircle, Eye } from "lucide-react";
 import DocumentViewer from "../components/DocumentViewer";
 
-const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete, onView }) => {
+const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete, onView, downloadsEnabled }) => {
     const isExpired = new Date(notice.validUntil) < new Date();
 
     return (
@@ -80,7 +80,7 @@ const NoticeCard = ({ notice, isAdmin, hasPermission, onEdit, onDelete, onView }
                     <span className="text-sm text-gray-400 italic px-3 py-1.5">No attachment</span>
                 )}
 
-                {notice.pdfPath && (
+                {notice.pdfPath && downloadsEnabled && (
                     <a
                         href={notice.pdfPath}
                         download
@@ -101,6 +101,7 @@ export default function Notices() {
     const [editingNotice, setEditingNotice] = useState(null);
     const [file, setFile] = useState(null);
     const [viewingFile, setViewingFile] = useState(null);
+    const [downloadsEnabled, setDownloadsEnabled] = useState(true);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -132,6 +133,15 @@ export default function Notices() {
 
             // Sort by date descending
             setNotices(mapped.sort((a, b) => new Date(b.date) - new Date(a.date)));
+
+            // Fetch Settings
+            const { data: settingsData } = await supabase
+                .from('settings')
+                .select('*')
+                .single();
+            if (settingsData) {
+                setDownloadsEnabled(settingsData.downloads_enabled !== false);
+            }
         } catch (error) {
             console.error("Error fetching notices:", error);
         }
@@ -302,6 +312,7 @@ export default function Notices() {
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onView={setViewingFile}
+                            downloadsEnabled={downloadsEnabled}
                         />
                     ))
                 ) : (
@@ -457,6 +468,7 @@ export default function Notices() {
                 fileUrl={viewingFile?.url}
                 fileType={viewingFile?.type}
                 fileName={viewingFile?.name}
+                downloadsEnabled={downloadsEnabled}
             />
         </div >
     );

@@ -86,6 +86,7 @@ export default function Syllabus() {
     const [syllabusData, setSyllabusData] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCourse, setEditingCourse] = useState(null);
+    const [downloadsEnabled, setDownloadsEnabled] = useState(true);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -106,6 +107,11 @@ export default function Syllabus() {
             const { data, error } = await supabase.from('syllabus').select('*').order('code', { ascending: true });
             if (error) throw error;
             setSyllabusData(data);
+
+            const { data: settingsData } = await supabase.from('settings').select('*').single();
+            if (settingsData && settingsData.downloads_enabled !== undefined) {
+                setDownloadsEnabled(settingsData.downloads_enabled);
+            }
         } catch (error) {
             console.error("Failed to fetch syllabus:", error);
         }
@@ -248,14 +254,16 @@ export default function Syllabus() {
                                 <FileText className="w-4 h-4 mr-2" />
                                 View
                             </a>
-                            <a
-                                href="/syllabus-4-1.pdf"
-                                download="Syllabus_NWU_CSE_4-1.pdf"
-                                className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors font-medium text-sm"
-                            >
-                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                Download
-                            </a>
+                            {downloadsEnabled && (
+                                <a
+                                    href="/syllabus-4-1.pdf"
+                                    download="Syllabus_NWU_CSE_4-1.pdf"
+                                    className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors font-medium text-sm"
+                                >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    Download
+                                </a>
+                            )}
                         </div>
                         {hasPermission('syllabus_edit') && (
                             <label className="inline-flex items-center px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors font-medium cursor-pointer text-xs mt-1">
@@ -302,14 +310,16 @@ export default function Syllabus() {
                                 <FileText className="w-4 h-4 mr-2" />
                                 View
                             </a>
-                            <a
-                                href="/syllabus.pdf"
-                                download="NWU_CSE_Syllabus.pdf"
-                                className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors font-medium text-sm"
-                            >
-                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                Download
-                            </a>
+                            {downloadsEnabled && (
+                                <a
+                                    href="/syllabus.pdf"
+                                    download="NWU_CSE_Syllabus.pdf"
+                                    className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors font-medium text-sm"
+                                >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    Download
+                                </a>
+                            )}
                         </div>
                         {hasPermission('syllabus_edit') && (
                             <label className="inline-flex items-center px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors font-medium cursor-pointer text-xs mt-1">

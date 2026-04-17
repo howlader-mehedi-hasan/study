@@ -63,6 +63,7 @@ export default function Schedule() {
     const [uploadingRoutine, setUploadingRoutine] = useState(false);
     const [timeSlots, setTimeSlots] = useState(DEFAULT_TIME_SLOTS);
     const [fridaySlots, setFridaySlots] = useState(DEFAULT_FRIDAY_SLOTS);
+    const [downloadsEnabled, setDownloadsEnabled] = useState(true);
     const [editingTimeSlots, setEditingTimeSlots] = useState([]);
     const [editingFridaySlots, setEditingFridaySlots] = useState([]);
 
@@ -178,6 +179,7 @@ export default function Schedule() {
             if (error) throw error;
             if (data) {
                 if (data.visible_days) setVisibleDays(data.visible_days);
+                if (data.downloads_enabled !== undefined) setDownloadsEnabled(data.downloads_enabled);
                 if (data.default_schedule_view) {
                     setIsPrecisionMode(data.default_schedule_view === 'precision');
                 }
@@ -1288,14 +1290,16 @@ export default function Schedule() {
                         <Eye className="w-5 h-5 mr-2" />
                         View Full Size
                     </a>
-                    <a
-                        href={routineUrl}
-                        download="routine.png"
-                        className="flex items-center px-6 py-3 bg-gray-900 hover:bg-gray-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-medium rounded-xl transition-colors shadow-lg"
-                    >
-                        <Download className="w-5 h-5 mr-2" />
-                        Download Image
-                    </a>
+                    {downloadsEnabled && (
+                        <a
+                            href={routineUrl}
+                            download="routine.png"
+                            className="flex items-center px-6 py-3 bg-gray-900 hover:bg-gray-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-medium rounded-xl transition-colors shadow-lg"
+                        >
+                            <Download className="w-5 h-5 mr-2" />
+                            Download Image
+                        </a>
+                    )}
                 </div>
             </div>
 

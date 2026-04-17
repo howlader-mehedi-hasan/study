@@ -1,13 +1,14 @@
 import React from "react";
 import { X, ExternalLink, Download } from "lucide-react";
 
-export default function DocumentViewer({ isOpen, onClose, fileUrl, fileType, fileName }) {
+export default function DocumentViewer({ isOpen, onClose, fileUrl, fileType, fileName, downloadsEnabled = true }) {
     if (!isOpen || !fileUrl) return null;
 
     // Detect if this is a supported MS Office extension to use the Office web viewer
     const isOfficeDoc = ['ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx'].includes(fileType?.toLowerCase());
     const isImage = fileType === 'image' || ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(fileType?.toLowerCase());
     const isPdf = fileType === 'pdf';
+    const isAudio = fileType === 'audio' || ['mp3', 'wav', 'ogg', 'opus', 'aac', 'flac', 'm4a'].includes(fileType?.toLowerCase());
 
     const renderContent = () => {
         if (isImage) {
@@ -18,6 +19,28 @@ export default function DocumentViewer({ isOpen, onClose, fileUrl, fileType, fil
                         alt={fileName || 'Document'}
                         className="max-w-full max-h-full object-contain rounded drop-shadow-lg"
                     />
+                </div>
+            );
+        }
+
+        if (isAudio) {
+            return (
+                <div className="flex flex-col items-center justify-center w-full h-full p-8 space-y-6">
+                    <div className="w-24 h-24 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center shadow-lg">
+                        <span className="text-4xl text-blue-500">🎵</span>
+                    </div>
+                    <h3 className="text-xl font-medium text-white truncate max-w-md text-center">{fileName}</h3>
+                    <div className="w-full max-w-md bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl">
+                        <audio
+                            controls
+                            controlsList={!downloadsEnabled ? "nodownload" : undefined}
+                            src={fileUrl}
+                            className="w-full outline-none"
+                            autoPlay
+                        >
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
                 </div>
             );
         }
@@ -54,16 +77,18 @@ export default function DocumentViewer({ isOpen, onClose, fileUrl, fileType, fil
                 <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Preview not available</h3>
                     <p className="text-gray-500 dark:text-gray-400 max-w-sm mb-6">
-                        This file type '{fileType}' cannot be viewed directly in the browser. You must download it to view its contents.
+                        This file type '{fileType}' cannot be viewed directly in the browser. {downloadsEnabled ? 'You must download it to view its contents.' : 'Downloads are currently disabled.'}
                     </p>
-                    <a
-                        href={fileUrl}
-                        download
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium shadow-sm"
-                    >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download File
-                    </a>
+                    {downloadsEnabled && (
+                        <a
+                            href={fileUrl}
+                            download
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium shadow-sm"
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Download File
+                        </a>
+                    )}
                 </div>
             </div>
         );
@@ -77,14 +102,16 @@ export default function DocumentViewer({ isOpen, onClose, fileUrl, fileType, fil
                     {fileName || 'Document Viewer'}
                 </h3>
                 <div className="flex items-center space-x-3 flex-shrink-0">
-                    <a
-                        href={fileUrl}
-                        download
-                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center group"
-                        title="Download"
-                    >
-                        <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                    </a>
+                    {downloadsEnabled && (
+                        <a
+                            href={fileUrl}
+                            download
+                            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center group"
+                            title="Download"
+                        >
+                            <Download className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        </a>
+                    )}
                     <a
                         href={fileUrl}
                         target="_blank"

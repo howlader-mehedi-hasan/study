@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { FileText, ArrowLeft, Download, Eye, HelpCircle, Upload, Check, Loader2, Plus, Trash2, Clock, Calendar, Pencil, BookOpen } from "lucide-react";
+import { FileText, ArrowLeft, Download, Eye, HelpCircle, Upload, Check, Loader2, Plus, Trash2, Clock, Calendar, Pencil, BookOpen, Headphones, ImageIcon } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import DocumentViewer from "../components/DocumentViewer";
 
@@ -25,6 +25,7 @@ export default function CourseView() {
 
     const [course, setCourse] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [downloadsEnabled, setDownloadsEnabled] = useState(true);
 
     useEffect(() => {
         const fetchCourseData = async () => {
@@ -48,6 +49,15 @@ export default function CourseView() {
                     .single();
 
                 setSyllabus(sylData);
+
+                // Fetch Global Settings
+                const { data: settingsData } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .single();
+                if (settingsData) {
+                    setDownloadsEnabled(settingsData.downloads_enabled !== false);
+                }
 
             } catch (err) {
                 console.error("Course fetch error:", err);
@@ -208,10 +218,12 @@ export default function CourseView() {
 
                 const ext = file.name.split('.').pop().toLowerCase();
                 let type = 'pdf'; // Default
-                if (['jpg', 'jpeg', 'png'].includes(ext)) {
+                if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) {
                     type = 'image';
                 } else if (['ppt', 'pptx'].includes(ext)) {
                     type = 'ppt';
+                } else if (['mp3', 'wav', 'ogg', 'opus', 'aac', 'flac', 'm4a'].includes(ext)) {
+                    type = 'audio';
                 }
 
                 uploadedFiles.push({
@@ -492,7 +504,7 @@ export default function CourseView() {
                                     multiple
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     onChange={(e) => setUploadFiles(e.target.files)}
-                                    accept="application/pdf,image/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                    accept="audio/*,application/pdf,image/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                 />
                                 {uploadFiles.length > 0 ? (
                                     <div className="flex items-center text-green-600 dark:text-green-400">
@@ -544,8 +556,8 @@ export default function CourseView() {
                             {course.files.map((file) => (
                                 <li key={file.id} className="p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors flex items-center justify-between group">
                                     <div className="flex items-center space-x-4 min-w-0">
-                                        <div className="w-12 h-12 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500 dark:text-red-400 flex-shrink-0 shadow-sm">
-                                            <FileText className="w-6 h-6" />
+                                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm ${file.type === 'audio' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-400' : file.type === 'image' ? 'bg-green-50 dark:bg-green-900/20 text-green-500 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
+                                            {file.type === 'audio' ? <Headphones className="w-6 h-6" /> : file.type === 'image' ? <ImageIcon className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="font-medium text-gray-900 dark:text-gray-100 truncate pr-4 text-base">{file.name}</p>
@@ -572,14 +584,16 @@ export default function CourseView() {
                                             <Eye className="w-4 h-4" />
                                             <span className="hidden sm:inline">Open</span>
                                         </button>
-                                        <a
-                                            href={file.path}
-                                            download
-                                            className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                                            title="Download"
-                                        >
-                                            <Download className="w-5 h-5" />
-                                        </a>
+                                        {downloadsEnabled && (
+                                            <a
+                                                href={file.path}
+                                                download
+                                                className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                                title="Download"
+                                            >
+                                                <Download className="w-5 h-5" />
+                                            </a>
+                                        )}
                                         {(hasPermission('courses_edit') || hasPermission('course_materials_edit')) && (
                                             <button
                                                 onClick={() => handleDelete(file.id)}
@@ -603,6 +617,7 @@ export default function CourseView() {
                 fileUrl={viewingFile?.url}
                 fileType={viewingFile?.type}
                 fileName={viewingFile?.name}
+                downloadsEnabled={downloadsEnabled}
             />
         </div>
     );

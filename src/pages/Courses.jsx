@@ -95,10 +95,12 @@ export default function Courses() {
 
                     const ext = fileName.split('.').pop().toLowerCase();
                     let type = 'pdf'; // default fallback text icon
-                    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+                    if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) {
                         type = 'image';
                     } else if (['ppt', 'pptx'].includes(ext)) {
                         type = 'ppt';
+                    } else if (['mp3', 'wav', 'ogg', 'opus', 'aac', 'flac', 'm4a'].includes(ext)) {
+                        type = 'audio';
                     }
 
                     // Get Public URL
@@ -471,7 +473,7 @@ export default function Courses() {
                                                     multiple
                                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                     onChange={(e) => setFiles(e.target.files)}
-                                                    accept="application/pdf,image/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                                                    accept="audio/*,application/pdf,image/*,.ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                                                 />
                                                 <div className="flex flex-col items-center">
                                                     {files.length > 0 ? (

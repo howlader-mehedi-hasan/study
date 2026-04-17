@@ -14,6 +14,7 @@ const SystemSettings = ({ user, isAdmin }) => {
     const [newsBgColor, setNewsBgColor] = useState("#DC2626");
     const [newsTextColor, setNewsTextColor] = useState("#FFFFFF");
     const [newsIsRounded, setNewsIsRounded] = useState(false);
+    const [downloadsEnabled, setDownloadsEnabled] = useState(true);
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsMessage, setSettingsMessage] = useState(null);
 
@@ -36,6 +37,7 @@ const SystemSettings = ({ user, isAdmin }) => {
                 setNewsBgColor(data.news_bg_color || "#DC2626");
                 setNewsTextColor(data.news_text_color || "#FFFFFF");
                 setNewsIsRounded(data.news_is_rounded || false);
+                setDownloadsEnabled(data.downloads_enabled !== false); // default to true
             }
         } catch (error) {
             console.error("Failed to fetch settings:", error);
@@ -55,11 +57,11 @@ const SystemSettings = ({ user, isAdmin }) => {
                 visible_days: visibleDays,
                 default_schedule_view: defaultScheduleView,
                 routine_switch_time: routineSwitchTime,
-                routine_switch_time: routineSwitchTime,
                 breaking_news: breakingNews,
                 news_bg_color: newsBgColor,
                 news_text_color: newsTextColor,
-                news_is_rounded: newsIsRounded
+                news_is_rounded: newsIsRounded,
+                downloads_enabled: downloadsEnabled
             });
 
             if (error) throw error;
@@ -228,6 +230,20 @@ const SystemSettings = ({ user, isAdmin }) => {
                                                 <span className="font-bold text-gray-700 dark:text-gray-300">Rounded Corners</span>
                                             </label>
                                         </div>
+                                    </div>
+                                    <div className="pt-4 border-t border-gray-100 dark:border-slate-700">
+                                        <label className="flex items-center space-x-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={downloadsEnabled}
+                                                onChange={(e) => setDownloadsEnabled(e.target.checked)}
+                                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                            />
+                                            <span className="font-bold text-gray-700 dark:text-gray-300">Enable File Downloads (Global)</span>
+                                        </label>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-8">
+                                            If disabled, all file download options (including audio) will be hidden across the website.
+                                        </p>
                                     </div>
                                 </>
                             )}
