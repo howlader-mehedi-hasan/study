@@ -10,6 +10,8 @@ export default function DailyRoutine() {
     const [holidays, setHolidays] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isAutoAdvanced, setIsAutoAdvanced] = useState(false);
+    const [timeSlots, setTimeSlots] = useState([]);
+    const [fridaySlots, setFridaySlots] = useState([]);
 
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -21,6 +23,10 @@ export default function DailyRoutine() {
                 // Fetch Settings
                 const { data: settingsData } = await supabase.from('settings').select('*').single();
                 const switchTime = settingsData?.routine_switch_time || "18:00";
+                if (settingsData) {
+                    if (settingsData.time_slots) setTimeSlots(settingsData.time_slots);
+                    if (settingsData.friday_slots) setFridaySlots(settingsData.friday_slots);
+                }
 
                 // Check Time for Auto-Advance
                 const now = new Date();
@@ -166,6 +172,22 @@ export default function DailyRoutine() {
         return `${h}:${minutes} ${ampm}`;
     };
 
+    // Helper: Get viewing time slot label
+    const getViewingTimeSlot = (item) => {
+        const slots = item.day === 'Friday' ? fridaySlots : timeSlots;
+        if (!slots || slots.length === 0) {
+            return `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`;
+        }
+        
+        const startSlot = slots.find(slot => item.startTime >= slot.start && item.startTime < slot.end);
+        
+        if (startSlot) {
+            return startSlot.label;
+        }
+        
+        return `${formatTime(item.startTime)} - ${formatTime(item.endTime)}`;
+    };
+
     if (loading) return <div className="p-6 text-center text-gray-500">Loading routine...</div>;
 
     return (
@@ -279,7 +301,7 @@ export default function DailyRoutine() {
                                     <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-slate-700 pt-2 mt-2">
                                         <div className="flex items-center">
                                             <Clock className="w-3 h-3 mr-1.5 text-gray-400" />
-                                            {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                                            {getViewingTimeSlot(item)}
                                         </div>
                                         {item.room && (
                                             <div className="flex items-center">
